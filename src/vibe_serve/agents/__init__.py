@@ -3,7 +3,7 @@
 The ``build_agent_runner`` function is added at the bottom once the concrete
 runner classes are imported, so the public API of this package is::
 
-    from vibeserve_agent.agents import AgentRunner, build_agent_runner
+    from vibe_serve.agents import AgentRunner, build_agent_runner
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def build_agent_runner(
         skill_source_dirs: Absolute source paths of skill directories — the
             cli runner copies these into the workspace's ``.claude/skills/``
             on each invoke.
-        model: Result of :func:`vibeserve_agent.llm_client._build_model` — only
+        model: Result of :func:`vibe_serve.llm_client._build_model` — only
             used by the deepagents path. The cli path uses ``model_name``.
         model_name: Bare model id (e.g. ``"claude-sonnet-4-6"``) — used both
             for the cli runner and for the deepagents ``AgentLogger`` prefix.

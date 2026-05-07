@@ -3,7 +3,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from vibeserve_agent.llm_client import _build_model
+from vibe_serve.llm_client import _build_model
 
 
 def _make_config(

@@ -2,7 +2,7 @@ import os
 import tomllib
 from pathlib import Path
 
-from vibeserve_agent.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT
+from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT
 
 _KNOWN_PROVIDERS = {"vertex-ai", "anthropic", "google-genai", "openai", "openai-compatible"}
 

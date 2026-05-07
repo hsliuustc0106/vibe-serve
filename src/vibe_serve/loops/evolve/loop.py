@@ -32,18 +32,18 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from vibeserve_agent.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
-from vibeserve_agent.context import _RunContext
-from vibeserve_agent.loops.evolve.population import (
+from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
+from vibe_serve.context import _RunContext
+from vibe_serve.loops.evolve.population import (
     Individual,
     Objective,
     Population,
 )
-from vibeserve_agent.schemas import MutatorResponse
-from vibeserve_agent.schemas import ProfilerSummary
-from vibeserve_agent.loops.profiler import invoke_profiler
-from vibeserve_agent.schemas import JudgeResponse, Verdict
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve.schemas import MutatorResponse
+from vibe_serve.schemas import ProfilerSummary
+from vibe_serve.loops.profiler import invoke_profiler
+from vibe_serve.schemas import JudgeResponse, Verdict
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
     make_run_environment_spec,
 )

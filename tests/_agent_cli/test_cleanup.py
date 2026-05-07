@@ -5,10 +5,10 @@ import subprocess
 import pytest
 
 from agentshim.executor import CommandRequest, CommandResult, CommandStreamSink
-from libs.agent_cli.claude import ClaudeCodeCodingAgent
-from libs.agent_cli.cli_agent import CLICodingAgent
-from libs.agent_cli.codex import CodexCodingAgent
-from libs.agent_cli.gemini import GeminiCodingAgent
+from vibe_serve._agent_cli.claude import ClaudeCodeCodingAgent
+from vibe_serve._agent_cli.cli_agent import CLICodingAgent
+from vibe_serve._agent_cli.codex import CodexCodingAgent
+from vibe_serve._agent_cli.gemini import GeminiCodingAgent
 
 
 class RecordingExecutor:

@@ -10,10 +10,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from libs.agent_cli.base import MCPServerSpec
-from vibeserve_agent.agents.base import AgentRunner
-from vibeserve_agent.loops.plain.runner_ext import PlainLoopAgentRunner
-from vibeserve_agent.loops.plain.issue_board import IssueBoard
+from vibe_serve._agent_cli.base import MCPServerSpec
+from vibe_serve.agents.base import AgentRunner
+from vibe_serve.loops.plain.runner_ext import PlainLoopAgentRunner
+from vibe_serve.loops.plain.issue_board import IssueBoard
 
 
 _EXPECTED_TOOL_NAMES = {"list_issues", "get_issue", "search_issues", "create_issue"}

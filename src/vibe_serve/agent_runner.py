@@ -6,8 +6,8 @@ import uuid
 
 from pydantic import ValidationError
 
-from vibeserve_agent.agents.callbacks import AgentLogger, TodoDisplay
-from vibeserve_agent.schemas import (
+from vibe_serve.agents.callbacks import AgentLogger, TodoDisplay
+from vibe_serve.schemas import (
     ImplementerResponse,
     IssueImplementerResponse,
     IssueJudgeResponse,

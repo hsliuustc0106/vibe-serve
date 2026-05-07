@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 
-# The servers live under inputs/ (co-located with the analysis scripts) so
+# The servers live under examples/ (co-located with the analysis scripts) so
 # importing them by file path keeps the tests decoupled from sys.path state.
 def _load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, str(path))
@@ -36,20 +36,20 @@ def _load_module(name: str, path: Path):
     return module
 
 
-_REPO = Path(__file__).resolve().parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent
 
 
 @pytest.fixture(scope="module")
 def nsys_server_mod():
     return _load_module(
-        "_nsys_server", _REPO / "inputs" / "nsys_profiler" / "server.py",
+        "_nsys_server", _REPO / "examples" / "nsys_profiler" / "server.py",
     )
 
 
 @pytest.fixture(scope="module")
 def torch_server_mod():
     return _load_module(
-        "_torch_server", _REPO / "inputs" / "torch_profiler" / "server.py",
+        "_torch_server", _REPO / "examples" / "torch_profiler" / "server.py",
     )
 
 

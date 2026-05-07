@@ -18,13 +18,13 @@ from typing import Callable
 from deepagents.backends import LocalShellBackend
 from deepagents.backends.sandbox import BaseSandbox
 
-from vibeserve_agent.backends.base import (
+from vibe_serve.backends.base import (
     ContentionMonitor,
     ModalOptions,
     SandboxKind,
     SetupFn,
 )
-from vibeserve_agent.constants import ComputeBackend
+from vibe_serve.constants import ComputeBackend
 
 
 class MetalBackend:

@@ -1,5 +1,5 @@
 import pytest
-from vibeserve_agent.llm_client import _is_google_model
+from vibe_serve.llm_client import _is_google_model
 
 
 @pytest.mark.parametrize(

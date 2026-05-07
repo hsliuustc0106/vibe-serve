@@ -1,14 +1,14 @@
 """Shared implementation behind the issue-tracker tool wrappers.
 
-Both the LangChain ``@tool`` callables in :mod:`vibeserve_agent.loops.plain.tools`
+Both the LangChain ``@tool`` callables in :mod:`vibe_serve.loops.plain.tools`
 and the FastMCP ``@mcp.tool()`` callables in
-:mod:`vibeserve_agent.loops.plain.mcp_server` delegate into the helpers in this
+:mod:`vibe_serve.loops.plain.mcp_server` delegate into the helpers in this
 module so that the deepagents path and the MCP path enforce identical
 per-iteration cap and type-allowlist semantics with byte-identical error
 strings and formatted output.
 
 This module is pure-Python and only depends on
-:mod:`vibeserve_agent.loops.plain.issue_board` (which itself only imports ``pydantic``).
+:mod:`vibe_serve.loops.plain.issue_board` (which itself only imports ``pydantic``).
 It is safe to import from any subprocess that does not have LangChain or the
 deepagents stack installed.
 """
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from vibeserve_agent.loops.plain.issue_board import (
+from vibe_serve.loops.plain.issue_board import (
     Issue,
     IssueBoard,
     IssueType,

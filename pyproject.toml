@@ -26,24 +26,39 @@ dependencies = [
 ]
 
 [project.scripts]
-vibe-serve = "vibeserve_agent.cli:main"
-vibe-serve-issue-mcp = "vibeserve_agent.loops.plain.mcp_server:main"
+vibe-serve = "vibe_serve.cli:main"
+vibe-serve-issue-mcp = "vibe_serve.loops.plain.mcp_server:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["vibeserve_agent*", "libs*"]
+where = ["src"]
+include = ["vibe_serve*"]
 
 [tool.setuptools.package-data]
-vibeserve_agent = ["templates/*.j2", "loops/agent/templates/*.j2", "loops/agent/templates/_modality/*/*.j2", "loops/evolve/templates/*.j2", "loops/plain/templates/*.j2", "loops/plain/templates/*/*.j2"]
+vibe_serve = ["templates/*.j2", "loops/agent/templates/*.j2", "loops/agent/templates/_modality/*/*.j2", "loops/evolve/templates/*.j2", "loops/plain/templates/*.j2", "loops/plain/templates/*/*.j2"]
 
 [dependency-groups]
 dev = [
     "matplotlib>=3.10.8",
     "pytest",
+    "ruff>=0.6",
+]
+test = [
+    "pytest",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = ["E501"]
 
 [tool.uv]
 package = true

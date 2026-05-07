@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from vibeserve_agent.constants import _ANTHROPIC_PREFIXES, _GOOGLE_PREFIXES, _OPENAI_PREFIXES
+from vibe_serve.constants import _ANTHROPIC_PREFIXES, _GOOGLE_PREFIXES, _OPENAI_PREFIXES
 
 
 def _is_google_model(model_name: str) -> bool:

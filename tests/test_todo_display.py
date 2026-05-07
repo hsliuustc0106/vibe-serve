@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibeserve_agent.agents.callbacks import TodoDisplay
+from vibe_serve.agents.callbacks import TodoDisplay
 
 
 # --- TodoDisplay rendering ---
@@ -89,14 +89,14 @@ def test_todo_display_with_dict_objects():
 
 def test_run_agent_passes_thread_id():
     """run_agent must pass a thread_id in config so checkpointer can persist state."""
-    from vibeserve_agent.agent_runner import run_agent
+    from vibe_serve.agent_runner import run_agent
 
     agent = MagicMock()
     agent.stream.return_value = iter([
         {"agent": {"messages": [MagicMock(type="ai", content="Done")]}},
     ])
 
-    with patch("vibeserve_agent.agent_runner.TodoDisplay"):
+    with patch("vibe_serve.agent_runner.TodoDisplay"):
         run_agent(agent, "do stuff")
 
     config = agent.stream.call_args[1].get("config") or agent.stream.call_args[0][1]
@@ -106,8 +106,8 @@ def test_run_agent_passes_thread_id():
 
 def test_run_judge_agent_passes_thread_id():
     """run_judge_agent must pass a thread_id in config so checkpointer can persist state."""
-    from vibeserve_agent.agent_runner import run_judge_agent
-    from vibeserve_agent.schemas import JudgeResponse, Verdict
+    from vibe_serve.agent_runner import run_judge_agent
+    from vibe_serve.schemas import JudgeResponse, Verdict
 
     agent = MagicMock()
     agent.stream.return_value = iter([
@@ -119,7 +119,7 @@ def test_run_judge_agent_passes_thread_id():
         }},
     ])
 
-    with patch("vibeserve_agent.agent_runner.TodoDisplay"):
+    with patch("vibe_serve.agent_runner.TodoDisplay"):
         run_judge_agent(agent, "review")
 
     config = agent.stream.call_args[1].get("config") or agent.stream.call_args[0][1]
@@ -132,7 +132,7 @@ def test_run_judge_agent_passes_thread_id():
 
 def test_run_agent_extracts_todos_from_tools_node():
     """run_agent picks up todos from the tools node (where write_todos Command lands)."""
-    from vibeserve_agent.agent_runner import run_agent
+    from vibe_serve.agent_runner import run_agent
 
     todos_seen = []
 
@@ -155,7 +155,7 @@ def test_run_agent_extracts_todos_from_tools_node():
         }},
     ])
 
-    with patch("vibeserve_agent.agent_runner.TodoDisplay") as MockTD:
+    with patch("vibe_serve.agent_runner.TodoDisplay") as MockTD:
         instance = MockTD.return_value
         instance.update.side_effect = lambda t: todos_seen.append(t)
         run_agent(agent, "do stuff")
@@ -167,7 +167,7 @@ def test_run_agent_extracts_todos_from_tools_node():
 
 def test_run_agent_extracts_todos_from_any_node():
     """run_agent finds todos regardless of which node key they appear under."""
-    from vibeserve_agent.agent_runner import run_agent
+    from vibe_serve.agent_runner import run_agent
 
     todos_seen = []
 
@@ -178,7 +178,7 @@ def test_run_agent_extracts_todos_from_any_node():
         }},
     ])
 
-    with patch("vibeserve_agent.agent_runner.TodoDisplay") as MockTD:
+    with patch("vibe_serve.agent_runner.TodoDisplay") as MockTD:
         instance = MockTD.return_value
         instance.update.side_effect = lambda t: todos_seen.append(t)
         run_agent(agent, "do stuff")
@@ -189,8 +189,8 @@ def test_run_agent_extracts_todos_from_any_node():
 
 def test_run_judge_agent_extracts_todos():
     """run_judge_agent picks up todos from the tools node."""
-    from vibeserve_agent.agent_runner import run_judge_agent
-    from vibeserve_agent.schemas import JudgeResponse, Verdict
+    from vibe_serve.agent_runner import run_judge_agent
+    from vibe_serve.schemas import JudgeResponse, Verdict
 
     todos_seen = []
 
@@ -208,7 +208,7 @@ def test_run_judge_agent_extracts_todos():
         }},
     ])
 
-    with patch("vibeserve_agent.agent_runner.TodoDisplay") as MockTD:
+    with patch("vibe_serve.agent_runner.TodoDisplay") as MockTD:
         instance = MockTD.return_value
         instance.update.side_effect = lambda t: todos_seen.append(t)
         run_judge_agent(agent, "review")

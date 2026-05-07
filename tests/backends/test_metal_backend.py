@@ -7,11 +7,11 @@ import argparse
 import pytest
 from deepagents.backends import LocalShellBackend
 
-from vibeserve_agent import backends
-from vibeserve_agent.backends import SandboxKind
-from vibeserve_agent.backends.metal import MetalBackend
-from vibeserve_agent.cli import _add_common_args
-from vibeserve_agent.constants import ComputeBackend
+from vibe_serve import backends
+from vibe_serve.backends import SandboxKind
+from vibe_serve.backends.metal import MetalBackend
+from vibe_serve.cli import _add_common_args
+from vibe_serve.constants import ComputeBackend
 
 
 def _make_backend(tmp_path) -> MetalBackend:

@@ -16,7 +16,7 @@ _backend/
 
 ## How they're used
 
-`Prompt(template_dir, backend)` (in `vibeserve_agent/prompts.py`) auto-injects every fragment under `_backend/<backend>/` as a kwarg keyed by **filename stem** on every `prompt.render(...)` call.
+`Prompt(template_dir, backend)` (in `vibe_serve/prompts.py`) auto-injects every fragment under `_backend/<backend>/` as a kwarg keyed by **filename stem** on every `prompt.render(...)` call.
 
 So a fragment file named `device_dtype.j2` is auto-injected as the kwarg `device_dtype`, and any parent template can reference it as `{{ device_dtype }}`. The parent template doesn't know or care which backend it's rendering against.
 
@@ -40,27 +40,27 @@ Explicit kwargs passed to `prompt.render(...)` override auto-injected fragments 
 ## Conventions for adding a new backend
 
 1. Add the variant to `ComputeBackend` in
-   `vibeserve_agent/constants.py`.
-2. Create `vibeserve_agent/templates/_backend/<new>/` and mirror every
+   `vibe_serve/constants.py`.
+2. Create `vibe_serve/templates/_backend/<new>/` and mirror every
    name in `ComputeBackendFragment.NAMES` (currently: `device_dtype.j2`,
    `judge_device_correctness.j2`, `profiling_workflow.j2`). Use an
    empty file for a deliberate skip, or short placeholder prose for
    a soft skip — don't leave the file out, validation will fail.
 3. Add a concrete `ComputeBackendFragment` subclass in
-   `vibeserve_agent/prompts.py`:
+   `vibe_serve/prompts.py`:
    ```python
    class RocmComputeBackendFragment(ComputeBackendFragment):
        backend = ComputeBackend.ROCM
    ```
    …and register it in `_FRAGMENT_IMPLS`.
 4. Wire up the backend's runtime impl under
-   `vibeserve_agent/backends/<new>/` and register it in
+   `vibe_serve/backends/<new>/` and register it in
    `backends/__init__.py`. See the existing CUDA and Metal impls for
    the pattern.
 
 ## Python contract
 
-The canonical list of fragment names lives on `ComputeBackendFragment.NAMES` (in `vibeserve_agent/prompts.py`), not in this directory layout. Adding a fragment is a 3-step change:
+The canonical list of fragment names lives on `ComputeBackendFragment.NAMES` (in `vibe_serve/prompts.py`), not in this directory layout. Adding a fragment is a 3-step change:
 
 1. Add the name to `ComputeBackendFragment.NAMES`.
 2. Create `<name>.j2` under every `_backend/<backend>/` directory

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vibeserve_agent.backends import SandboxKind
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve.backends import SandboxKind
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentRequest,
     RunEnvironmentSpec,
     build_run_environment,
@@ -248,7 +248,7 @@ def test_docker_remove_workspace_child_quotes_path(tmp_path, monkeypatch):
         result.stderr = b""
         return result
 
-    monkeypatch.setattr("vibeserve_agent.sandbox.run_environment.subprocess.run", fake_run)
+    monkeypatch.setattr("vibe_serve.sandbox.run_environment.subprocess.run", fake_run)
 
     ok = env.remove_workspace_child(
         tmp_path,

@@ -1,9 +1,9 @@
 """Integration tests for the issue-loop orchestrator.
 
-These tests mock ``vibeserve_agent.context.build_agent_runner`` so the real
+These tests mock ``vibe_serve.context.build_agent_runner`` so the real
 LangChain / CLI plumbing never executes. Each test exercises one focused
 behaviour of the drain-and-perf-eval outer loop in
-``vibeserve_agent/plain/loop.py``.
+``vibe_serve/plain/loop.py``.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibeserve_agent.agents import AgentRunner
-from vibeserve_agent.loops.plain.loop import PlainLoopState, run_plain_loop
-from vibeserve_agent.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
-from vibeserve_agent.schemas import (
+from vibe_serve.agents import AgentRunner
+from vibe_serve.loops.plain.loop import PlainLoopState, run_plain_loop
+from vibe_serve.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
+from vibe_serve.schemas import (
     IssueImplementerResponse,
     IssueJudgeResponse,
     IssuePerfEvalResponse,
@@ -121,9 +121,9 @@ def ref_file(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_bootstrap_creates_initial_feature_issue_on_first_run(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -136,7 +136,7 @@ def test_bootstrap_creates_initial_feature_issue_on_first_run(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -158,9 +158,9 @@ def test_bootstrap_creates_initial_feature_issue_on_first_run(
     assert "FastAPI" in title or "inference server" in title
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_bootstrap_idempotent_on_resume(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -175,7 +175,7 @@ def test_bootstrap_idempotent_on_resume(
             _make_perf_resp(new_issue_ids=[]),
         ]
     )
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -194,7 +194,7 @@ def test_bootstrap_idempotent_on_resume(
             _make_perf_resp(new_issue_ids=[]),  # only perf_eval — nothing open to drain
         ]
     )
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name=exp_dir.name,
@@ -216,9 +216,9 @@ def test_bootstrap_idempotent_on_resume(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_judge_pass_closes_issue(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -231,7 +231,7 @@ def test_judge_pass_closes_issue(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -246,9 +246,9 @@ def test_judge_pass_closes_issue(
     assert issue1.status == IssueStatus.CLOSED
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_judge_fail_increments_attempts_and_keeps_open(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -265,7 +265,7 @@ def test_judge_fail_increments_attempts_and_keeps_open(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -283,9 +283,9 @@ def test_judge_fail_increments_attempts_and_keeps_open(
     assert issue1.status == IssueStatus.CLOSED
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_issue_blocks_after_max_attempts_exhausted(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -300,7 +300,7 @@ def test_issue_blocks_after_max_attempts_exhausted(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -328,7 +328,7 @@ def _spec_args_to_dict(args: list[str]) -> dict[str, str]:
 
     The args list is shaped like::
 
-        ["-m", "vibeserve_agent.loops.plain.mcp_server", "issues.json",
+        ["-m", "vibe_serve.loops.plain.mcp_server", "issues.json",
          "--creator", "judge", "--iteration", "1",
          "--allowed-types", "bug", "--cap", "1"]
 
@@ -354,9 +354,9 @@ _EXPECTED_TRACKER_TOOL_NAMES = {
 
 
 @pytest.mark.parametrize("backend_name", ["deepagents", "cli"])
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_judge_invoke_receives_tracker_kwargs(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path, backend_name
 ):
@@ -379,7 +379,7 @@ def test_judge_invoke_receives_tracker_kwargs(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -414,9 +414,9 @@ def test_judge_invoke_receives_tracker_kwargs(
 
 
 @pytest.mark.parametrize("backend_name", ["deepagents", "cli"])
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_perf_eval_invoke_receives_tracker_kwargs(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path, backend_name
 ):
@@ -438,7 +438,7 @@ def test_perf_eval_invoke_receives_tracker_kwargs(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -471,9 +471,9 @@ def test_perf_eval_invoke_receives_tracker_kwargs(
         assert {t.name for t in tools} == _EXPECTED_TRACKER_TOOL_NAMES
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_judge_phase_calls_store_reload_after_invoke(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -512,7 +512,7 @@ def test_judge_phase_calls_store_reload_after_invoke(
     runner.invoke.side_effect = tracking_invoke
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path), patch.object(
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path), patch.object(
         IssueBoard, "reload", tracking_reload,
     ):
         run_plain_loop(
@@ -529,9 +529,9 @@ def test_judge_phase_calls_store_reload_after_invoke(
 
 
 @pytest.mark.parametrize("backend_name", ["deepagents", "cli"])
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_implementer_invoke_has_no_tracker_kwargs(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path, backend_name
 ):
@@ -553,7 +553,7 @@ def test_implementer_invoke_has_no_tracker_kwargs(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -593,9 +593,9 @@ def test_implementer_invoke_has_no_tracker_kwargs(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_perf_eval_runs_after_drain_complete(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -610,7 +610,7 @@ def test_perf_eval_runs_after_drain_complete(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -642,9 +642,9 @@ def test_perf_eval_runs_after_drain_complete(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_resume_with_bootstrap_done_skips_bootstrap_creation(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -659,7 +659,7 @@ def test_resume_with_bootstrap_done_skips_bootstrap_creation(
             _make_perf_resp(new_issue_ids=[]),
         ]
     )
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -676,7 +676,7 @@ def test_resume_with_bootstrap_done_skips_bootstrap_creation(
     mock_build_runner.reset_mock()
     runner2 = _make_issue_runner([_make_perf_resp(new_issue_ids=[])])
     mock_build_runner.return_value = runner2
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name=exp_dir.name,
@@ -696,9 +696,9 @@ def test_resume_with_bootstrap_done_skips_bootstrap_creation(
     assert kinds == ["perf_eval"]
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_resume_retries_previously_blocked_issue(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -717,7 +717,7 @@ def test_resume_retries_previously_blocked_issue(
             _make_judge_resp(1, verdict="fail", feedback="still nope"),
         ]
     )
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result1 = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -742,7 +742,7 @@ def test_resume_retries_previously_blocked_issue(
             _make_perf_resp(new_issue_ids=[]),
         ]
     )
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result2 = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name=exp_dir.name,
@@ -768,9 +768,9 @@ def test_resume_retries_previously_blocked_issue(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_run_returns_true_when_perf_eval_files_no_issues_after_clean_drain(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -785,7 +785,7 @@ def test_run_returns_true_when_perf_eval_files_no_issues_after_clean_drain(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         result = run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -802,9 +802,9 @@ def test_run_returns_true_when_perf_eval_files_no_issues_after_clean_drain(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_state_json_written_with_bootstrap_done_after_run(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -818,7 +818,7 @@ def test_state_json_written_with_bootstrap_done_after_run(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -841,9 +841,9 @@ def test_state_json_written_with_bootstrap_done_after_run(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_issue_loop_writes_per_issue_markdown_via_callback(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -860,7 +860,7 @@ def test_issue_loop_writes_per_issue_markdown_via_callback(
         ]
     )
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",
@@ -901,9 +901,9 @@ def test_issue_loop_writes_per_issue_markdown_via_callback(
 # ---------------------------------------------------------------------------
 
 
-@patch("vibeserve_agent.context._build_model")
-@patch("vibeserve_agent.backends.cuda.LocalShellBackend")
-@patch("vibeserve_agent.context.build_agent_runner")
+@patch("vibe_serve.context._build_model")
+@patch("vibe_serve.backends.cuda.LocalShellBackend")
+@patch("vibe_serve.context.build_agent_runner")
 def test_implementer_retry_user_prompt_includes_prior_judge_feedback(
     mock_build_runner, mock_backend, mock_build, ref_file, tmp_path
 ):
@@ -926,7 +926,7 @@ def test_implementer_retry_user_prompt_includes_prior_judge_feedback(
     )
     mock_build_runner.return_value = runner
 
-    with patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path):
+    with patch("vibe_serve.context.PROJECT_ROOT", tmp_path):
         run_plain_loop(
             config={"model": {"name": "claude-sonnet-4-6"}},
             exp_name="test",

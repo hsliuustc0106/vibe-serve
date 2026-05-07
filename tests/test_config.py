@@ -4,7 +4,7 @@ import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
-from vibeserve_agent.config import _load_config, _load_dotenv_file
+from vibe_serve.config import _load_config, _load_dotenv_file
 
 
 class TestLoadConfigValid:

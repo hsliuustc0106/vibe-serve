@@ -10,7 +10,7 @@ The agent loop's "issue board" is two markdown files in the workspace:
     orchestrator reads the full file when planning the next round.
 
 Both surfaces together are this loop's planning artifact, parallel to
-the plain loop's structured :class:`~vibeserve_agent.loops.plain.issue_board.IssueBoard`
+the plain loop's structured :class:`~vibe_serve.loops.plain.issue_board.IssueBoard`
 (``issues.json``).
 """
 
@@ -18,12 +18,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vibeserve_agent.schemas import (
+from vibe_serve.schemas import (
     OrchestratorPlan,
     PreRoundDecision,
     ProfilerSummary,
 )
-from vibeserve_agent.schemas import (
+from vibe_serve.schemas import (
     ImplementerResponse,
     JudgeResponse,
 )

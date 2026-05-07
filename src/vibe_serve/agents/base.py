@@ -2,16 +2,16 @@
 
 Two implementations live alongside this module:
 
-- :mod:`vibeserve_agent.agents.deepagents_runner` wraps the existing
+- :mod:`vibe_serve.agents.deepagents_runner` wraps the existing
   ``deepagents`` + ``langchain`` stack used by every loop today.
-- :mod:`vibeserve_agent.agents.cli_runner` wraps an
-  ``agentshim``-backed ``libs.agent_cli`` compatibility layer, which drives
+- :mod:`vibe_serve.agents.cli_runner` wraps an
+  ``agentshim``-backed ``vibe_serve._agent_cli`` compatibility layer, which drives
   external coding-agent CLIs
   (Claude Code, Gemini, Codex, Opencode).
 
 The simple loop calls a single ``invoke()`` method per (iteration × phase).
 There is intentionally no separate ``Session`` type — today's loops always
-build a fresh agent for each call (clean context window) and ``libs.agent_cli``
+build a fresh agent for each call (clean context window) and ``vibe_serve._agent_cli``
 is one-shot at the Python layer, so a reusable session would either be a thin
 struct or would lie about reuse semantics on one of the backends.
 """
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol, TypeVar
 
 from langchain_core.tools import BaseTool
-from libs.agent_cli.base import MCPServerSpec
+from vibe_serve._agent_cli.base import MCPServerSpec
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
@@ -72,7 +72,7 @@ class AgentRunner(Protocol):
             mcp_servers: Optional list of stdio MCP servers to install for
                 the duration of this call. The cli runner forwards these to
                 the underlying ``CodingAgent``'s
-                :meth:`~libs.agent_cli.base.CodingAgent.install_mcp_servers`
+                :meth:`~vibe_serve._agent_cli.base.CodingAgent.install_mcp_servers`
                 hook (then uninstalls in ``finally``); the deepagents runner
                 ignores this kwarg.
             tools: Optional list of in-process LangChain tools to expose to

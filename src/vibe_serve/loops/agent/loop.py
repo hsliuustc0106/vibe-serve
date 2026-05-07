@@ -15,22 +15,22 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from vibeserve_agent.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
-from vibeserve_agent.context import _RunContext
-from vibeserve_agent.loops.agent import issue_board
-from vibeserve_agent.schemas import (
+from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
+from vibe_serve.context import _RunContext
+from vibe_serve.loops.agent import issue_board
+from vibe_serve.schemas import (
     OrchestratorPlan,
     PreRoundDecision,
     ProfilerSummary,
 )
-from vibeserve_agent.loops.profiler import invoke_profiler
-from vibeserve_agent.prompts import render_template
-from vibeserve_agent.schemas import (
+from vibe_serve.loops.profiler import invoke_profiler
+from vibe_serve.prompts import render_template
+from vibe_serve.schemas import (
     ImplementerResponse,
     JudgeResponse,
     Verdict,
 )
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
     make_run_environment_spec,
 )

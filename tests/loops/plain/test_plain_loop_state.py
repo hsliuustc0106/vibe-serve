@@ -4,13 +4,13 @@ import json
 
 import pytest
 
-from vibeserve_agent.loops.plain.loop import (
+from vibe_serve.loops.plain.loop import (
     PlainLoopState,
     _determine_resume_point,
     _load_state,
     _save_state,
 )
-from vibeserve_agent.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
+from vibe_serve.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
 
 
 def _make_store(tmp_path) -> IssueBoard:

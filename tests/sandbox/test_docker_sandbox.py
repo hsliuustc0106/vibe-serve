@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from vibeserve_agent.sandbox.docker_sandbox import DockerSandbox
+from vibe_serve.sandbox.docker_sandbox import DockerSandbox
 
 
 @pytest.fixture()
@@ -461,14 +461,14 @@ class TestCleanupOnExit:
     @pytest.fixture(autouse=True)
     def _clear_live_containers(self):
         """Isolate the global _live_containers registry between tests."""
-        from vibeserve_agent.sandbox.docker_sandbox import _live_containers
+        from vibe_serve.sandbox.docker_sandbox import _live_containers
         _live_containers.clear()
         yield
         _live_containers.clear()
 
     @patch("subprocess.run")
     def test_live_containers_tracked(self, mock_run, sandbox):
-        from vibeserve_agent.sandbox.docker_sandbox import _live_containers
+        from vibe_serve.sandbox.docker_sandbox import _live_containers
 
         mock_run.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="abc123\n", stderr=""
@@ -482,7 +482,7 @@ class TestCleanupOnExit:
 
     @patch("subprocess.run")
     def test_cleanup_containers_stops_all(self, mock_run, sandbox):
-        from vibeserve_agent.sandbox.docker_sandbox import _cleanup_containers, _live_containers
+        from vibe_serve.sandbox.docker_sandbox import _cleanup_containers, _live_containers
 
         mock_run.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="container_xyz\n", stderr=""

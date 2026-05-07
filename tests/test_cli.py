@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vibeserve_agent.cli import _extract_flag, _extract_loop_selection, main
+from vibe_serve.cli import _extract_flag, _extract_loop_selection, main
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ def test_extract_loop_selection_unknown_outer_loop_exits():
 def test_main_routes_to_runner(loop_name: str, runner_attr: str):
     argv = ["vibe-serve", "--outer-loop", loop_name, "--exp-name", "x"]
     with patch.object(sys, "argv", argv), patch(
-        f"vibeserve_agent.cli.{runner_attr}"
+        f"vibe_serve.cli.{runner_attr}"
     ) as runner:
         main()
         runner.assert_called_once()

@@ -1,6 +1,6 @@
 """CLI implementation of :class:`AgentRunner`.
 
-Wraps the local ``libs.agent_cli`` compatibility layer, which is backed by
+Wraps the local ``vibe_serve._agent_cli`` compatibility layer, which is backed by
 the open-source ``agentshim`` package plus a few repo-specific extensions for
 Docker command routing and per-invocation MCP install/uninstall. Each
 ``invoke()``:
@@ -13,7 +13,7 @@ Docker command routing and per-invocation MCP install/uninstall. Each
 3. Passes :class:`AgentLogger` as the CLI event handler so on-screen output
    matches the deepagents path.
 4. Calls ``agent.generate(prompt, cwd=workspace, …)``.
-5. Reuses :func:`vibeserve_agent.agent_runner._parse_typed_response_text`
+5. Reuses :func:`vibe_serve.agent_runner._parse_typed_response_text`
    to coerce the returned string back into the requested Pydantic model.
 """
 
@@ -26,19 +26,19 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from langchain_core.tools import BaseTool
-from libs.agent_cli.base import CodingAgent, MCPServerSpec
-from libs.agent_cli.claude import ClaudeCodeCodingAgent
-from libs.agent_cli.codex import CodexCodingAgent
-from libs.agent_cli.gemini import GeminiCodingAgent
-from libs.agent_cli.opencode import OpencodeCodingAgent
+from vibe_serve._agent_cli.base import CodingAgent, MCPServerSpec
+from vibe_serve._agent_cli.claude import ClaudeCodeCodingAgent
+from vibe_serve._agent_cli.codex import CodexCodingAgent
+from vibe_serve._agent_cli.gemini import GeminiCodingAgent
+from vibe_serve._agent_cli.opencode import OpencodeCodingAgent
 from pydantic import BaseModel
 
-from vibeserve_agent.agent_runner import (
+from vibe_serve.agent_runner import (
     _DEFAULT_MAX_TEXT_LEN,
     _log_and_print,
     _parse_typed_response_text,
 )
-from vibeserve_agent.agents.callbacks import AgentLogger
+from vibe_serve.agents.callbacks import AgentLogger
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -146,7 +146,7 @@ def _build_schema_hint(response_cls: type[BaseModel]) -> str:
 
 
 class CliAgentRunner:
-    """:class:`AgentRunner` backed by ``libs.agent_cli`` CLI agents."""
+    """:class:`AgentRunner` backed by ``vibe_serve._agent_cli`` CLI agents."""
 
     backend_name = "cli"
 
@@ -240,7 +240,7 @@ class CliAgentRunner:
             # ``run()``, so a fallback-triggered sandbox restart is picked up
             # automatically — no per-invocation refresh needed here.
         elif self._docker_sandboxes is not None:
-            from vibeserve_agent.agents.docker_executor import DockerCommandExecutor
+            from vibe_serve.agents.docker_executor import DockerCommandExecutor
 
             sandbox = self._docker_sandboxes[kind]
             executor = DockerCommandExecutor(sandbox._container_id)
@@ -251,7 +251,7 @@ class CliAgentRunner:
             )
             self._agents[kind] = agent
         elif self._modal_sandboxes is not None:
-            from vibeserve_agent.agents.modal_executor import ModalCommandExecutor
+            from vibe_serve.agents.modal_executor import ModalCommandExecutor
 
             sandbox = self._modal_sandboxes[kind]
             executor = ModalCommandExecutor(sandbox)

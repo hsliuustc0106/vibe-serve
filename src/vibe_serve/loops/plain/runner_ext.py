@@ -1,6 +1,6 @@
 """Issue-tracker runner customization.
 
-Wraps any :class:`~vibeserve_agent.agents.base.AgentRunner` and injects
+Wraps any :class:`~vibe_serve.agents.base.AgentRunner` and injects
 tracker access for the ``judge`` and ``perf_eval`` phases. The wrapper
 picks the right transport (MCP server spec for the cli backend, in-process
 ``@tool`` callables for the deepagents backend) by inspecting the inner
@@ -23,13 +23,13 @@ from __future__ import annotations
 from typing import Any, TypeVar
 
 from langchain_core.tools import BaseTool
-from libs.agent_cli.base import MCPServerSpec
+from vibe_serve._agent_cli.base import MCPServerSpec
 from pydantic import BaseModel
 
-from vibeserve_agent.agents.base import AgentRunner
-from vibeserve_agent.loops.plain.mcp_config import build_issue_mcp_spec
-from vibeserve_agent.loops.plain.issue_board import IssueBoard, IssueType
-from vibeserve_agent.loops.plain.tools import build_issue_tools
+from vibe_serve.agents.base import AgentRunner
+from vibe_serve.loops.plain.mcp_config import build_issue_mcp_spec
+from vibe_serve.loops.plain.issue_board import IssueBoard, IssueType
+from vibe_serve.loops.plain.tools import build_issue_tools
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -123,7 +123,7 @@ class PlainLoopAgentRunner:
         them straight to ``create_deep_agent(tools=...)``).
 
         Both factories share the policy semantics in
-        :mod:`vibeserve_agent.loops.plain.tool_impl`, so cap and type-allowlist
+        :mod:`vibe_serve.loops.plain.tool_impl`, so cap and type-allowlist
         enforcement is byte-identical between backends.
         """
         if self._inner.backend_name == "cli":

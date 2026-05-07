@@ -8,7 +8,7 @@ Two concepts:
   directory.
 - **Fragment** — a small reusable snippet meant to be composed *into*
   a template, not rendered standalone. Lives at
-  ``vibeserve_agent/templates/_backend/<backend>/<name>.j2``. The
+  ``vibe_serve/templates/_backend/<backend>/<name>.j2``. The
   ``_backend/`` prefix marks "fragment directory, not a place to find
   full templates".
 
@@ -26,7 +26,7 @@ filename stem on every ``render(...)`` call. Templates can therefore
 reference ``{{ device_dtype }}`` regardless of which backend the run
 targets.
 
-See ``vibeserve_agent/templates/_backend/README.md`` for the
+See ``vibe_serve/templates/_backend/README.md`` for the
 fragment-filename convention contributors should follow.
 """
 
@@ -36,7 +36,7 @@ from typing import ClassVar
 
 from jinja2 import Environment, FileSystemLoader
 
-from vibeserve_agent.constants import ComputeBackend
+from vibe_serve.constants import ComputeBackend
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -55,7 +55,7 @@ def _build_env(template_dir: Path | str | None = None) -> Environment:
     """Return a Jinja2 Environment for the given template directory.
 
     Per-mode template directories also fall back to the shared
-    ``vibeserve_agent/templates/`` root, so ``{% include
+    ``vibe_serve/templates/`` root, so ``{% include
     "_backend/<name>/foo.j2" %}`` from a per-mode template (and
     fragment lookups via :class:`ComputeBackendFragment`) resolve from the
     shared root.
@@ -94,7 +94,7 @@ def render_template(
 
 class ComputeBackendFragment(ABC):
     """Provides backend-specific Jinja fragments under
-    ``vibeserve_agent/templates/_backend/<backend>/``.
+    ``vibe_serve/templates/_backend/<backend>/``.
 
     Subclasses must set ``backend = ComputeBackend.<X>``. The default
     rendering reads ``<backend>/<name>.j2`` from the shared templates
@@ -203,7 +203,7 @@ class Prompt:
     template_dir:
         Per-mode directory the renderer searches first (e.g.
         ``orchestrate/templates/``). Falls back to the shared
-        ``vibeserve_agent/templates/`` root, where backend fragments
+        ``vibe_serve/templates/`` root, where backend fragments
         live.
     backend:
         Hardware backend the run targets. Selects the

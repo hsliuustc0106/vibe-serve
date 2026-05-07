@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from vibeserve_agent.constants import _DIM, _BOLD, _CYAN, _GREEN, _RED, _YELLOW, _RESET
+from vibe_serve.constants import _DIM, _BOLD, _CYAN, _GREEN, _RED, _YELLOW, _RESET
 
 
 ContextWindowLookup = Callable[[str | None], int | None]
@@ -369,8 +369,8 @@ class AgentLogger(BaseCallbackHandler):
     #
     # The deepagents path drives ``AgentLogger`` via the langchain
     # ``BaseCallbackHandler`` hooks (``on_llm_new_token``, ``on_tool_end``, …).
-    # The cli runner in ``vibeserve_agent.agents.cli_runner`` receives events
-    # from ``libs.agent_cli.AgentEventHandler`` directly on this object. Both
+    # The cli runner in ``vibe_serve.agents.cli_runner`` receives events
+    # from ``vibe_serve._agent_cli.AgentEventHandler`` directly on this object. Both
     # paths converge on the same private ``_print_*`` formatters, so on-screen
     # output is identical regardless of which backend is in use.
 

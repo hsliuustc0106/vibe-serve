@@ -12,21 +12,21 @@ from typing import Callable
 from deepagents.backends import LocalShellBackend
 from deepagents.backends.sandbox import BaseSandbox
 
-from vibeserve_agent.backends.base import (
+from vibe_serve.backends.base import (
     ContentionMonitor,
     ModalOptions,
     SandboxKind,
     SetupFn,
 )
-from vibeserve_agent.backends.cuda.gpu_monitor import (
+from vibe_serve.backends.cuda.gpu_monitor import (
     GpuContentionMonitor,
     GpuInfo,
     pick_gpu,
     query_gpu_info,
 )
-from vibeserve_agent.constants import ComputeBackend
-from vibeserve_agent.sandbox.docker_sandbox import DockerSandbox
-from vibeserve_agent.sandbox.modal_sandbox import ModalSandbox
+from vibe_serve.constants import ComputeBackend
+from vibe_serve.sandbox.docker_sandbox import DockerSandbox
+from vibe_serve.sandbox.modal_sandbox import ModalSandbox
 
 # Default container image for the cuda backend.  Carries CUDA toolkit + PyTorch.
 _DEFAULT_IMAGE = "nvcr.io/nvidia/pytorch:25.04-py3"

@@ -9,12 +9,12 @@ from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 
-from vibeserve_agent import backends
-from vibeserve_agent.agent_runner import _log_and_print
-from vibeserve_agent.agents import build_agent_runner
-from vibeserve_agent.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT
-from vibeserve_agent.llm_client import _build_model
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve import backends
+from vibe_serve.agent_runner import _log_and_print
+from vibe_serve.agents import build_agent_runner
+from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT
+from vibe_serve.llm_client import _build_model
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentRequest,
     RunEnvironmentSpec,
     build_run_environment,
@@ -113,7 +113,7 @@ class _RunContext:
     It creates the run directory, log files, unified workspace, model, compute
     backend, copied helper inputs, git/snapshot tracking, run-environment
     session, agent runner, and GPU monitor. Environment-specific setup should stay in
-    ``vibeserve_agent.sandbox.run_environment``; this class should only ask the selected
+    ``vibe_serve.sandbox.run_environment``; this class should only ask the selected
     run environment for policy decisions and the opened sandbox session.
     """
 
@@ -156,7 +156,7 @@ class _RunContext:
         # Dirs excluded from workspace copy, git tracking, and the
         # Modal-side tar download. ``_auth`` and ``_opt_vibeserve`` are
         # our own "bind-mount redirect" dirs under --modal (host auth +
-        # vibeserve_agent pkg uploaded into /workspace/_auth and
+        # vibe_serve pkg uploaded into /workspace/_auth and
         # /workspace/_opt_vibeserve respectively) — not implementer
         # output, and we never want them in git history. ``_mounts`` is
         # the Docker ancestor-mount redirect dir for the same reason.
@@ -203,10 +203,10 @@ class _RunContext:
             raise ValueError(f"Unknown profiler kind: {profiler_kind!r}")
         self.profiler_kind = resolved_profiler
 
-        # Default torch_profiler_path to inputs/torch_profiler/ if --profiler=torch
+        # Default torch_profiler_path to examples/torch_profiler/ if --profiler=torch
         # and the user didn't explicitly set --torch-profiler.
         if self.profiler_kind == "torch" and self.torch_profiler_path is None:
-            default_tp = PROJECT_ROOT / "inputs" / "torch_profiler"
+            default_tp = PROJECT_ROOT / "examples" / "torch_profiler"
             if default_tp.is_dir():
                 self.torch_profiler_path = str(default_tp)
 
@@ -355,7 +355,7 @@ class _RunContext:
             self.gpu_monitor.start()
 
         # Build the backend-agnostic agent runner. Loops invoke this instead
-        # of calling create_deep_agent / libs.agent_cli directly. The cli
+        # of calling create_deep_agent / vibe_serve._agent_cli directly. The cli
         # backend is rejected if --docker is set; build_agent_runner raises
         # SystemExit with a clear message in that case.
         self.agent_runner = build_agent_runner(

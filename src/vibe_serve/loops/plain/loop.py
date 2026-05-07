@@ -28,18 +28,18 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-from vibeserve_agent.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
-from vibeserve_agent.context import _RunContext
-from vibeserve_agent.loops.plain.render import render_all
-from vibeserve_agent.loops.plain.runner_ext import PlainLoopAgentRunner
-from vibeserve_agent.loops.plain.issue_board import (
+from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
+from vibe_serve.context import _RunContext
+from vibe_serve.loops.plain.render import render_all
+from vibe_serve.loops.plain.runner_ext import PlainLoopAgentRunner
+from vibe_serve.loops.plain.issue_board import (
     Issue,
     IssueStatus,
     IssueBoard,
     IssueType,
 )
-from vibeserve_agent.prompts import Prompt
-from vibeserve_agent.schemas import (
+from vibe_serve.prompts import Prompt
+from vibe_serve.schemas import (
     IssueImplementerResponse,
     IssueJudgeResponse,
     IssuePerfEvalResponse,
@@ -47,7 +47,7 @@ from vibeserve_agent.schemas import (
     PerfTrend,
     Verdict,
 )
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
     make_run_environment_spec,
 )
@@ -422,7 +422,7 @@ def run_plain_loop(
         # tracker access (in-process @tool callables under deepagents,
         # MCP server spec under cli). The wrapper consumes an extra
         # ``iteration=`` kwarg on invoke() that the loop passes per call.
-        # See vibeserve_agent/plain/runner_ext.py.
+        # See vibe_serve/plain/runner_ext.py.
         ctx.agent_runner = PlainLoopAgentRunner(
             ctx.agent_runner,
             store=store,
@@ -600,7 +600,7 @@ def run_plain_loop(
                 # PlainLoopAgentRunner injects tracker access (in-process
                 # @tool callables under deepagents, MCPServerSpec under
                 # cli) for kind="judge" — see
-                # vibeserve_agent/plain/runner_ext.py. The judge may file
+                # vibe_serve/plain/runner_ext.py. The judge may file
                 # at most ONE bug-type issue per review; that policy is
                 # enforced by the wrapper.
                 judge_issue_id = issue.id
@@ -712,7 +712,7 @@ def run_plain_loop(
             # PlainLoopAgentRunner injects tracker access for kind="perf_eval"
             # and scopes the per-iteration cap by the iteration kwarg below,
             # so issues filed here are counted against iter_label's budget.
-            # See vibeserve_agent/plain/runner_ext.py.
+            # See vibe_serve/plain/runner_ext.py.
             perf_response = ctx.invoke(
                 kind="perf_eval",
                 iteration=iter_label,

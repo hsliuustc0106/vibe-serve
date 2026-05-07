@@ -3,14 +3,14 @@
 Usage::
 
     vibeserve-issue-mcp /path/to/issues.json [options]
-    python -m vibeserve_agent.loops.plain.mcp_server /path/to/issues.json [options]
+    python -m vibe_serve.loops.plain.mcp_server /path/to/issues.json [options]
 
 Mounts four tools (``list_issues``, ``get_issue``, ``search_issues``,
 ``create_issue``) against the given ``issues.json`` file. Any MCP client can
 mount this server: Claude Desktop, Cursor, custom MCP clients, or the
 vibeserve issue-loop's own ``.mcp.json`` sandwich (added in a separate PR).
 
-The four tools delegate into :mod:`vibeserve_agent.loops.plain.tool_impl` so that
+The four tools delegate into :mod:`vibe_serve.loops.plain.tool_impl` so that
 the deepagents (LangChain ``@tool``) path and the MCP path enforce identical
 per-iteration cap and type-allowlist semantics with byte-identical error
 strings.
@@ -23,8 +23,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from vibeserve_agent.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
-from vibeserve_agent.loops.plain.tool_impl import (
+from vibe_serve.loops.plain.issue_board import IssueStatus, IssueBoard, IssueType
+from vibe_serve.loops.plain.tool_impl import (
     CreateIssuePolicy,
     create_issue_under_policy,
     format_issue_full,

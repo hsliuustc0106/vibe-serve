@@ -1,7 +1,7 @@
 """Deepagents implementation of :class:`AgentRunner`.
 
 Wraps ``deepagents.create_deep_agent`` and the existing
-``vibeserve_agent.agent_runner._run_typed_agent`` plumbing — no behavior
+``vibe_serve.agent_runner._run_typed_agent`` plumbing — no behavior
 change vs. what the simple loop did before this abstraction landed.
 """
 
@@ -15,15 +15,15 @@ from deepagents import create_deep_agent
 from langchain.agents.structured_output import AutoStrategy
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
-from libs.agent_cli.base import MCPServerSpec
+from vibe_serve._agent_cli.base import MCPServerSpec
 from pydantic import BaseModel
 
-from vibeserve_agent.agent_runner import (
+from vibe_serve.agent_runner import (
     _DEFAULT_MAX_TEXT_LEN,
     _log_agent_config,
     _run_typed_agent,
 )
-from vibeserve_agent.agents.callbacks import AgentLogger
+from vibe_serve.agents.callbacks import AgentLogger
 
 T = TypeVar("T", bound=BaseModel)
 

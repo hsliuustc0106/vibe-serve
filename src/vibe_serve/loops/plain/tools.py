@@ -14,8 +14,8 @@ Subset routing (chosen by the loop):
   all three types allowed.
 
 The actual logic for parsing, validation, store mutation, and formatting
-lives in :mod:`vibeserve_agent.loops.plain.tool_impl` and is shared with the
-standalone MCP server in :mod:`vibeserve_agent.loops.plain.mcp_server`. The
+lives in :mod:`vibe_serve.loops.plain.tool_impl` and is shared with the
+standalone MCP server in :mod:`vibe_serve.loops.plain.mcp_server`. The
 ``@tool`` callables here are thin shells that delegate.
 """
 
@@ -23,12 +23,12 @@ from __future__ import annotations
 
 from langchain_core.tools import BaseTool, tool
 
-from vibeserve_agent.loops.plain.issue_board import (
+from vibe_serve.loops.plain.issue_board import (
     IssueStatus,
     IssueBoard,
     IssueType,
 )
-from vibeserve_agent.loops.plain.tool_impl import (
+from vibe_serve.loops.plain.tool_impl import (
     CreateIssuePolicy,
     create_issue_under_policy,
     format_issue_full,

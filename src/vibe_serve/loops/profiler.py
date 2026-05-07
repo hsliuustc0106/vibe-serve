@@ -16,19 +16,19 @@ and decides what to do with the returned summary.
 
 from __future__ import annotations
 
-from vibeserve_agent.schemas import ProfilerSummary
+from vibe_serve.schemas import ProfilerSummary
 
 
 def mcp_spec(profiler_kind: str):
     """Build an ``MCPServerSpec`` that spawns the analysis MCP server.
 
-    Returns ``None`` when ``libs.agent_cli`` is not importable in the
+    Returns ``None`` when ``vibe_serve._agent_cli`` is not importable in the
     current environment (e.g. a unit-test process that doesn't pull in
     the cli runner).  Callers treat ``None`` as "skip MCP"; the
     profiler agent still runs, just without tool access.
     """
     try:
-        from libs.agent_cli import MCPServerSpec
+        from vibe_serve._agent_cli import MCPServerSpec
     except Exception:
         return None
     if profiler_kind == "torch":

@@ -1,6 +1,6 @@
 """agentshim command executor for vibeserve Modal sandboxes.
 
-Companion to :mod:`vibeserve_agent.agents.docker_executor`.  Drives a
+Companion to :mod:`vibe_serve.agents.docker_executor`.  Drives a
 running ``modal.Sandbox`` (wrapped by :class:`ModalSandbox`) via the
 Modal Python SDK rather than ``modal shell -c``: the latter does not
 reliably forward stdin/EOF to the remote process, which is fatal for

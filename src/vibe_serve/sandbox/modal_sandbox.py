@@ -222,7 +222,7 @@ class ModalSandbox(BaseSandbox):
                 for auxiliary weights like EAGLE draft models
                 (``/draft_model``).  Volumes are looked up lazily and must
                 exist in Modal; populate them via
-                ``vibeserve_agent.sandbox.modal_model_setup.ensure_model_volume``
+                ``vibe_serve.sandbox.modal_model_setup.ensure_model_volume``
                 before starting the sandbox.
             extra_writable_volumes: Additional ``mountpoint -> volume_name``
                 entries mounted read-write. Used for persistent CLI auth
@@ -778,7 +778,7 @@ class ModalSandbox(BaseSandbox):
         ".pytest_cache",
         "_mounts",
         "_auth",            # host CLI auth uploaded from ~/.codex etc.
-        "_opt_vibeserve",   # vibeserve_agent pkg uploaded for MCP
+        "_opt_vibeserve",   # vibe_serve pkg uploaded for MCP
         "acc_checker",
         "bench",
         "skills",

@@ -1,19 +1,19 @@
-"""Tests for vibeserve_agent.loops.agent — orchestrator-driven build loop."""
+"""Tests for vibe_serve.loops.agent — orchestrator-driven build loop."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibeserve_agent.agents import AgentRunner
-from vibeserve_agent.loops.agent.loop import run_agent_loop
-from vibeserve_agent.schemas import (
+from vibe_serve.agents import AgentRunner
+from vibe_serve.loops.agent.loop import run_agent_loop
+from vibe_serve.schemas import (
     OrchestratorPlan,
     PreRoundDecision,
     ProfilerSummary,
 )
-from vibeserve_agent.loops.agent import issue_board
-from vibeserve_agent.schemas import (
+from vibe_serve.loops.agent import issue_board
+from vibe_serve.schemas import (
     ImplementerResponse,
     JudgeResponse,
     Verdict,
@@ -121,10 +121,10 @@ def _invoke_orchestrate(tmp_path, ref_file, runner, **kwargs):
     )
     defaults.update(kwargs)
     with (
-        patch("vibeserve_agent.context._build_model", return_value="mock-model"),
-        patch("vibeserve_agent.backends.cuda.LocalShellBackend"),
-        patch("vibeserve_agent.context.build_agent_runner", return_value=runner),
-        patch("vibeserve_agent.context.PROJECT_ROOT", tmp_path),
+        patch("vibe_serve.context._build_model", return_value="mock-model"),
+        patch("vibe_serve.backends.cuda.LocalShellBackend"),
+        patch("vibe_serve.context.build_agent_runner", return_value=runner),
+        patch("vibe_serve.context.PROJECT_ROOT", tmp_path),
     ):
         return run_agent_loop(**defaults)
 
@@ -385,7 +385,7 @@ def test_loop_max_rounds_terminates(tmp_path, ref_file):
 
 
 def test_cli_loads_objective_md_from_ref_parent(tmp_path):
-    from vibeserve_agent.cli import _load_objective
+    from vibe_serve.cli import _load_objective
 
     ref_dir = tmp_path / "modelA" / "reference"
     ref_dir.mkdir(parents=True)
@@ -398,7 +398,7 @@ def test_cli_loads_objective_md_from_ref_parent(tmp_path):
 
 
 def test_cli_missing_objective_md_errors(tmp_path):
-    from vibeserve_agent.cli import _load_objective
+    from vibe_serve.cli import _load_objective
 
     ref_dir = tmp_path / "modelB" / "reference"
     ref_dir.mkdir(parents=True)
@@ -409,7 +409,7 @@ def test_cli_missing_objective_md_errors(tmp_path):
 
 def test_cli_rejects_modal_with_nsys_profiler(tmp_path, ref_file):
     """--modal only supports torch profiler."""
-    from vibeserve_agent.cli import _build_agent_parser, _validate_agent
+    from vibe_serve.cli import _build_agent_parser, _validate_agent
 
     parser = _build_agent_parser()
     validate_args = _validate_agent
@@ -434,7 +434,7 @@ def test_cli_rejects_modal_with_nsys_profiler(tmp_path, ref_file):
 
 
 def test_ensure_roadmap_seeds_header_when_missing(tmp_path):
-    from vibeserve_agent.loops.agent import issue_board
+    from vibe_serve.loops.agent import issue_board
 
     p = tmp_path / "roadmap.md"
     assert not p.exists()
@@ -450,7 +450,7 @@ def test_ensure_roadmap_seeds_header_when_missing(tmp_path):
 
 
 def test_ensure_roadmap_does_not_overwrite_existing(tmp_path):
-    from vibeserve_agent.loops.agent import issue_board
+    from vibe_serve.loops.agent import issue_board
 
     p = tmp_path / "roadmap.md"
     p.write_text("# my custom plan\n")
@@ -459,7 +459,7 @@ def test_ensure_roadmap_does_not_overwrite_existing(tmp_path):
 
 
 def test_read_roadmap_returns_text(tmp_path):
-    from vibeserve_agent.loops.agent import issue_board
+    from vibe_serve.loops.agent import issue_board
 
     p = tmp_path / "roadmap.md"
     p.write_text("hello\n")
@@ -467,7 +467,7 @@ def test_read_roadmap_returns_text(tmp_path):
 
 
 def test_read_roadmap_missing_returns_empty(tmp_path):
-    from vibeserve_agent.loops.agent import issue_board
+    from vibe_serve.loops.agent import issue_board
 
     p = tmp_path / "nope.md"
     assert issue_board.read_roadmap(p) == ""
@@ -475,7 +475,7 @@ def test_read_roadmap_missing_returns_empty(tmp_path):
 
 def _record(round_number: int, perf: float | None, unit: str = "tok/s"):
     """Build a _RoundRecord shorthand for plateau tests."""
-    from vibeserve_agent.loops.agent.loop import _RoundRecord
+    from vibe_serve.loops.agent.loop import _RoundRecord
 
     return _RoundRecord(
         round_number=round_number,
@@ -487,7 +487,7 @@ def _record(round_number: int, perf: float | None, unit: str = "tok/s"):
 
 
 def test_detect_plateau_returns_none_when_too_few_rounds():
-    from vibeserve_agent.loops.agent.loop import _detect_plateau
+    from vibe_serve.loops.agent.loop import _detect_plateau
 
     # Two rounds is below the 3-round minimum streak.
     records = [_record(1, 40.0), _record(2, 41.0)]
@@ -495,7 +495,7 @@ def test_detect_plateau_returns_none_when_too_few_rounds():
 
 
 def test_detect_plateau_fires_on_flat_perf_streak():
-    from vibeserve_agent.loops.agent.loop import _detect_plateau
+    from vibe_serve.loops.agent.loop import _detect_plateau
 
     # 41.0 vs 41.5 is ~1.2% spread — well under the 5% threshold.
     records = [_record(1, 41.0), _record(2, 41.5), _record(3, 41.2)]
@@ -506,7 +506,7 @@ def test_detect_plateau_fires_on_flat_perf_streak():
 
 
 def test_detect_plateau_skips_when_perf_diverges():
-    from vibeserve_agent.loops.agent.loop import _detect_plateau
+    from vibe_serve.loops.agent.loop import _detect_plateau
 
     # 41.0 vs 116.0 is ~64% spread — clearly off-plateau.
     records = [_record(1, 41.0), _record(2, 116.0), _record(3, 114.5)]
@@ -516,7 +516,7 @@ def test_detect_plateau_skips_when_perf_diverges():
 def test_detect_plateau_ignores_rounds_without_perf():
     """Rounds where the profiler skipped or the round failed (perf=None) must
     not interrupt the streak — only valid measurements count."""
-    from vibeserve_agent.loops.agent.loop import _detect_plateau
+    from vibe_serve.loops.agent.loop import _detect_plateau
 
     records = [
         _record(1, 41.0),
@@ -532,7 +532,7 @@ def test_detect_plateau_ignores_rounds_without_perf():
 def test_detect_plateau_streak_must_be_recent():
     """A plateau early in the run that's followed by a clear win must NOT
     fire a warning on the next round — only the *last N* matter."""
-    from vibeserve_agent.loops.agent.loop import _detect_plateau
+    from vibe_serve.loops.agent.loop import _detect_plateau
 
     records = [
         _record(1, 41.0),  # plateau

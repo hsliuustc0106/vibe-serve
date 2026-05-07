@@ -12,7 +12,7 @@ markdown files mirrored next to ``logs/issues.json``:
         ...
 
 The renderer is invoked by ``IssueBoard``'s ``on_change`` callback (see
-``vibeserve_agent/plain/issue_board.py``) so the markdown view is always
+``vibe_serve/plain/issue_board.py``) so the markdown view is always
 re-generated after every successful save. Writes are atomic via the same
 tmp+rename pattern the store uses.
 
@@ -28,7 +28,7 @@ import re
 import unicodedata
 from pathlib import Path
 
-from vibeserve_agent.loops.plain.issue_board import (
+from vibe_serve.loops.plain.issue_board import (
     Issue,
     IssueEvent,
     IssueStatus,

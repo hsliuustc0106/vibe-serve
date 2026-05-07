@@ -28,9 +28,9 @@ cp agent.toml.example agent.toml
 ```bash
 # Agent loop, codex CLI, Docker on local CUDA, 4 rounds
 vibe-serve \
-  --ref inputs/moonshine-streaming/reference \
-  --acc-checker inputs/moonshine-streaming/accuracy_checker \
-  --bench inputs/moonshine-streaming/benchmark \
+  --ref examples/moonshine-streaming/reference \
+  --acc-checker examples/moonshine-streaming/accuracy_checker \
+  --bench examples/moonshine-streaming/benchmark \
   --exp-name my-experiment \
   --docker \
   --agent-backend cli --cli-provider codex \
@@ -51,10 +51,10 @@ vibe-serve-issue-mcp                         # serves issues.json over MCP
 
 ## Inputs
 
-Each model lives under `inputs/<name>/`:
+Each model lives under `examples/<name>/`:
 
 ```
-inputs/<name>/
+examples/<name>/
 ├── OBJECTIVE.md          # free-form goal handed to the orchestrator
 ├── reference/            # reference HuggingFace implementation
 │   ├── reference.py
@@ -66,8 +66,8 @@ inputs/<name>/
 ```
 
 `OBJECTIVE.md` is read at the start of every run; it must live next to
-`--ref` (sibling, not inside).  See `inputs/Llama-3-8B/`,
-`inputs/moonshine-streaming/`, `inputs/qwen3-32b-code-edit/`, etc. for
+`--ref` (sibling, not inside).  See `examples/Llama-3-8B/`,
+`examples/moonshine-streaming/`, `examples/qwen3-32b-code-edit/`, etc. for
 working examples.
 
 For multi-objective evolutionary runs, drop an `objectives.toml` next to
@@ -121,7 +121,7 @@ vibe-serve --resume 20260507-...     # specific dir
 ## Architecture
 
 ```
-vibeserve_agent/
+src/vibe_serve/
 ├── cli.py                        # single entry point: `vibe-serve`
 ├── context.py                    # _RunContext: lifecycle + ctx.invoke()
 ├── agent_runner.py               # invoke wrappers + structured-response extraction
@@ -164,7 +164,7 @@ Per-loop algorithms (one round each):
 
 ```bash
 uv run pytest                                  # full suite
-uv run pytest tests/test_plain_loop.py         # one file
+uv run pytest tests/loops/plain/test_plain_loop.py  # one file
 uv run pytest -k orchestrator                  # by keyword
 ```
 

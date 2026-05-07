@@ -22,13 +22,13 @@ import sys
 import tomllib
 from pathlib import Path
 
-from vibeserve_agent.config import _load_config
-from vibeserve_agent.constants import (
+from vibe_serve.config import _load_config
+from vibe_serve.constants import (
     ComputeBackend,
     KNOWN_COMPUTE_BACKENDS,
     PROJECT_ROOT,
 )
-from vibeserve_agent.sandbox.run_environment import (
+from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
     make_run_environment_spec,
 )
@@ -112,8 +112,8 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     """Add CLI arguments shared across every outer-loop parser."""
     parser.add_argument(
         "--ref",
-        default="inputs/Llama-3-8B/reference",
-        help="Path to reference implementation file, or directory containing at least one reference.py (default: inputs/Llama-3-8B/reference)",
+        default="examples/Llama-3-8B/reference",
+        help="Path to reference implementation file, or directory containing at least one reference.py (default: examples/Llama-3-8B/reference)",
     )
     parser.add_argument(
         "--exp-name",
@@ -130,14 +130,14 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--acc-checker",
         type=Path,
-        default=Path("inputs/Llama-3-8B/accuracy_checker"),
-        help="Path to a directory containing accuracy checker code/documents (default: inputs/Llama-3-8B/accuracy_checker).",
+        default=Path("examples/Llama-3-8B/accuracy_checker"),
+        help="Path to a directory containing accuracy checker code/documents (default: examples/Llama-3-8B/accuracy_checker).",
     )
     parser.add_argument(
         "--bench",
         type=Path,
-        default=Path("inputs/Llama-3-8B/benchmark"),
-        help="Path to a directory containing benchmark code/documents (default: inputs/Llama-3-8B/benchmark).",
+        default=Path("examples/Llama-3-8B/benchmark"),
+        help="Path to a directory containing benchmark code/documents (default: examples/Llama-3-8B/benchmark).",
     )
     parser.add_argument(
         "--nsys-profiler",
@@ -164,14 +164,14 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--skills-dir",
-        default=[Path("skills/serving-systems")],
+        default=[Path("resources/skills/serving-systems")],
         action="append",
         type=Path,
         help=(
             "Path to a skill source (can be repeated). Each entry can be "
             "either a single skill directory (containing a top-level "
             "`SKILL.md`) or a parent directory of multiple skill directories. "
-            "Default: `skills/serving-systems/`."
+            "Default: `resources/skills/serving-systems/`."
         ),
     )
     parser.add_argument(
@@ -400,7 +400,7 @@ def _validate_agent(args: argparse.Namespace) -> None:
 
 def _run_agent(args: argparse.Namespace) -> None:
     config, skills, backend = load_config_and_skills(args)
-    from vibeserve_agent.loops.agent.loop import run_agent_loop
+    from vibe_serve.loops.agent.loop import run_agent_loop
 
     objective = _load_objective(args.ref)
 
@@ -458,7 +458,7 @@ def _run_agent(args: argparse.Namespace) -> None:
 
 def _parse_cli_objective(spec: str):
     """Parse a ``--objective`` flag value (``name:direction``)."""
-    from vibeserve_agent.loops.evolve.population import Objective
+    from vibe_serve.loops.evolve.population import Objective
 
     if ":" not in spec:
         raise argparse.ArgumentTypeError(
@@ -478,7 +478,7 @@ def _parse_cli_objective(spec: str):
 
 def _load_objectives_toml(reference_path: str) -> list:
     """Read ``objectives.toml`` sibling to OBJECTIVE.md if present."""
-    from vibeserve_agent.loops.evolve.population import Objective
+    from vibe_serve.loops.evolve.population import Objective
 
     ref = Path(reference_path).expanduser().resolve()
     path = ref.parent / "objectives.toml"
@@ -550,7 +550,7 @@ def _validate_evolve(args: argparse.Namespace) -> None:
 
 def _run_evolve(args: argparse.Namespace) -> None:
     config, skills, backend = load_config_and_skills(args)
-    from vibeserve_agent.loops.evolve.loop import run_evolve_loop
+    from vibe_serve.loops.evolve.loop import run_evolve_loop
 
     objective = _load_objective(args.ref)
     objectives = _resolve_objectives(args)
@@ -632,7 +632,7 @@ def _validate_plain(args: argparse.Namespace) -> None:
 
 def _run_plain(args: argparse.Namespace) -> None:
     config, skills, backend = load_config_and_skills(args)
-    from vibeserve_agent.loops.plain.loop import (
+    from vibe_serve.loops.plain.loop import (
         PlainLoopState,
         _load_state,
         run_plain_loop,
@@ -686,7 +686,7 @@ def _run_plain(args: argparse.Namespace) -> None:
         debug=args.debug,
         acc_checker=str(args.acc_checker) if args.acc_checker else None,
         bench=str(args.bench) if args.bench else None,
-        nsys_profiler=str(PROJECT_ROOT / "inputs" / "nsys_profiler"),
+        nsys_profiler=str(PROJECT_ROOT / "examples" / "nsys_profiler"),
         skills_dirs=skills,
         run_environment=run_environment_spec_from_args(args),
         agent_backend=args.agent_backend,
@@ -729,7 +729,7 @@ def main() -> None:
     loop_kind, remaining = _extract_loop_selection(sys.argv[1:])
     args = _PARSER_BUILDERS[loop_kind]().parse_args(remaining)
     # Resolve validator + runner via globals() so unittest.mock.patch on
-    # ``vibeserve_agent.cli._{validate,run}_<kind>`` takes effect.
+    # ``vibe_serve.cli._{validate,run}_<kind>`` takes effect.
     globals()[_VALIDATORS[loop_kind]](args)
     globals()[_RUNNERS[loop_kind]](args)
 

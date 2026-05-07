@@ -38,7 +38,7 @@ This collection assumes existing kernel libraries. Writing new CUDA / Triton / C
 ## Setup
 
 The vibeserve agent CLIs auto-load this skill from `skills/serving-systems/`
-via the `--skills-dir` flag (default in `vibeserve_agent/cli_common.py`),
+via the `--skills-dir` flag (default in `vibe_serve/cli_common.py`),
 copying the skill tree into each workspace's `.claude/skills/` so the
 in-workspace coding agent picks it up.
 

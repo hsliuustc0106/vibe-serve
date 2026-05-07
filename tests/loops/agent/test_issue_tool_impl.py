@@ -1,4 +1,4 @@
-"""Tests for the shared tool implementation in vibeserve_agent.loops.plain.tool_impl.
+"""Tests for the shared tool implementation in vibe_serve.loops.plain.tool_impl.
 
 These tests cover the validators, the create-issue policy enforcement, and
 the formatting helpers that both the LangChain ``@tool`` wrappers and the
@@ -9,8 +9,8 @@ prompt templates document these exact strings.
 
 import pytest
 
-from vibeserve_agent.loops.plain.issue_board import IssueBoard, IssueType
-from vibeserve_agent.loops.plain.tool_impl import (
+from vibe_serve.loops.plain.issue_board import IssueBoard, IssueType
+from vibe_serve.loops.plain.tool_impl import (
     CreateIssuePolicy,
     check_create_allowed,
     create_issue_under_policy,

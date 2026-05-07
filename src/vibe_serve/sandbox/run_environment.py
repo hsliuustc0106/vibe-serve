@@ -35,9 +35,9 @@ from typing import Callable, Mapping, Protocol
 
 from deepagents.backends.sandbox import BaseSandbox
 
-from vibeserve_agent.backends import ModalOptions, SandboxKind
-from vibeserve_agent.backends.base import ComputeBackendImpl, SetupFn
-from vibeserve_agent.constants import PROJECT_ROOT
+from vibe_serve.backends import ModalOptions, SandboxKind
+from vibe_serve.backends.base import ComputeBackendImpl, SetupFn
+from vibe_serve.constants import PROJECT_ROOT
 
 
 @dataclass(frozen=True)
@@ -382,7 +382,7 @@ class ModalEnvironment(_NoopWorkspaceRecovery):
         meta_path = request.ref_dir / "meta.json"
         if not meta_path.exists():
             return
-        from vibeserve_agent.sandbox.modal_model_setup import ensure_model_volume
+        from vibe_serve.sandbox.modal_model_setup import ensure_model_volume
 
         meta = json.loads(meta_path.read_text())
         model_id = meta.get("model_id")
@@ -421,7 +421,7 @@ class ModalEnvironment(_NoopWorkspaceRecovery):
         draft_meta_path = request.ref_dir / "draft_meta.json"
         if not draft_meta_path.exists():
             return None
-        from vibeserve_agent.sandbox.modal_model_setup import ensure_model_volume
+        from vibe_serve.sandbox.modal_model_setup import ensure_model_volume
 
         draft_meta = json.loads(draft_meta_path.read_text())
         draft_model_id = draft_meta.get("model_id")
@@ -561,7 +561,7 @@ def _modal_runtime_notes(gpu: str, app_name: str) -> str:
         "model when applicable) to learn the `model_id` for each. "
         "The framework normalizes each `model_id` into the volume "
         "name with this exact rule (matches "
-        "`vibeserve_agent/modal_model_setup.py::_volume_name_for`):\n"
+        "`vibe_serve/modal_model_setup.py::_volume_name_for`):\n"
         "      `re.sub(r\"[^a-z0-9]+\", \"-\", model_id.lower()).strip(\"-\")`\n"
         "    prefixed with `vibeserve-model-`. Every run of non-"
         "alphanumeric characters (slashes, dots, underscores, etc.) "
@@ -759,7 +759,7 @@ def _container_mount_plan(
         and (request.agent_backend or "cli") == "cli"
         and request.cli_provider
     ):
-        from vibeserve_agent.agents.cli_docker import auth_bind_mounts
+        from vibe_serve.agents.cli_docker import auth_bind_mounts
 
         bind_mounts.extend(auth_bind_mounts(request.cli_provider))
         bind_mounts.append((str(request.project_root), "/opt/vibeserve", True))
@@ -773,7 +773,7 @@ def _cli_container_setup(
     effective_agent = request.agent_backend or "cli"
     if effective_agent != "cli" or not request.cli_provider:
         return [], {}
-    from vibeserve_agent.agents.cli_docker import (
+    from vibe_serve.agents.cli_docker import (
         DOCKER_PROVIDER_ENV,
         docker_init_commands,
     )

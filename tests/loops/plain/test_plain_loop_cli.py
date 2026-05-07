@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from vibeserve_agent.cli import _build_plain_parser as build_parser, main
-from vibeserve_agent.loops.plain.loop import PlainLoopState
+from vibe_serve.cli import _build_plain_parser as build_parser, main
+from vibe_serve.loops.plain.loop import PlainLoopState
 
 
 class TestBuildParser:
@@ -65,15 +65,15 @@ class TestMain:
 
     def _patch_run(self, return_value: bool):
         return patch(
-            "vibeserve_agent.loops.plain.loop.run_plain_loop",
+            "vibe_serve.loops.plain.loop.run_plain_loop",
             return_value=return_value,
         )
 
     def _patch_config(self):
-        from vibeserve_agent.constants import DEFAULT_COMPUTE_BACKEND
+        from vibe_serve.constants import DEFAULT_COMPUTE_BACKEND
 
         return patch(
-            "vibeserve_agent.cli.load_config_and_skills",
+            "vibe_serve.cli.load_config_and_skills",
             return_value=(
                 {"model": {"name": "claude-sonnet-4-6"}},
                 None,
@@ -101,7 +101,7 @@ class TestMain:
             "--max-issues-per-perf-eval", "2",
         ]):
             with self._patch_config(), patch(
-                "vibeserve_agent.loops.plain.loop.run_plain_loop",
+                "vibe_serve.loops.plain.loop.run_plain_loop",
                 return_value=True,
             ) as mock_run:
                 main()
@@ -117,10 +117,10 @@ class TestMain:
             "--start-round", "3",
         ]):
             with self._patch_config(), patch(
-                "vibeserve_agent.cli._resolve_run_dir",
+                "vibe_serve.cli._resolve_run_dir",
                 return_value="fake-run-dir",
             ), patch(
-                "vibeserve_agent.loops.plain.loop.run_plain_loop",
+                "vibe_serve.loops.plain.loop.run_plain_loop",
                 return_value=True,
             ) as mock_run:
                 main()
@@ -138,7 +138,7 @@ class TestMain:
             "--cli-provider", "claude",
         ]):
             with self._patch_config(), patch(
-                "vibeserve_agent.loops.plain.loop.run_plain_loop",
+                "vibe_serve.loops.plain.loop.run_plain_loop",
                 return_value=True,
             ) as mock_run:
                 main()
@@ -149,7 +149,7 @@ class TestMain:
     def test_main_defaults_agent_backend_and_cli_provider_to_none(self):
         with patch("sys.argv", list(self._BASE_ARGV)):
             with self._patch_config(), patch(
-                "vibeserve_agent.loops.plain.loop.run_plain_loop",
+                "vibe_serve.loops.plain.loop.run_plain_loop",
                 return_value=True,
             ) as mock_run:
                 main()
@@ -168,7 +168,7 @@ class TestMain:
             "--cli-provider", provider,
         ]):
             with self._patch_config(), patch(
-                "vibeserve_agent.loops.plain.loop.run_plain_loop",
+                "vibe_serve.loops.plain.loop.run_plain_loop",
                 return_value=True,
             ) as mock_run:
                 main()

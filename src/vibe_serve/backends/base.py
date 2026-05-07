@@ -21,7 +21,7 @@ from typing import Callable, Protocol, runtime_checkable
 
 from deepagents.backends.sandbox import BaseSandbox
 
-from vibeserve_agent.constants import ComputeBackend
+from vibe_serve.constants import ComputeBackend
 
 
 class SandboxKind(StrEnum):

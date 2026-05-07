@@ -5,7 +5,7 @@ Each backend lives in its own subpackage (e.g. ``cuda/``) and exposes a
 
 Add a new backend by:
 
-1. Adding the variant to :class:`vibeserve_agent.constants.ComputeBackend`.
+1. Adding the variant to :class:`vibe_serve.constants.ComputeBackend`.
 2. Creating ``backends/<name>/`` with an ``__init__.py`` that defines a
    ``ComputeBackendImpl`` and any backend-private helpers (e.g. monitor modules).
 3. Registering the impl in :data:`_REGISTRY` below.
@@ -16,14 +16,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from vibeserve_agent.backends.base import (
+from vibe_serve.backends.base import (
     ComputeBackendImpl,
     ContentionMonitor,
     Device,
     ModalOptions,
     SandboxKind,
 )
-from vibeserve_agent.constants import ComputeBackend
+from vibe_serve.constants import ComputeBackend
 
 _REGISTRY: dict[ComputeBackend, type[ComputeBackendImpl]] = {}
 
@@ -50,8 +50,8 @@ def get(
 # Default registration.  Imported lazily to avoid pulling deepagents/Modal
 # into modules that just want the protocol types.
 def _register_defaults() -> None:
-    from vibeserve_agent.backends.cuda import CudaBackend
-    from vibeserve_agent.backends.metal import MetalBackend
+    from vibe_serve.backends.cuda import CudaBackend
+    from vibe_serve.backends.metal import MetalBackend
 
     register(ComputeBackend.CUDA, CudaBackend)
     register(ComputeBackend.METAL, MetalBackend)

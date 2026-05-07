@@ -55,7 +55,7 @@ class IssueEvent(BaseModel):
     judge) when an event records an agent action. It is optional and defaults
     to ``None`` for events that have no rich content (creation, claim,
     blocked-out). The store treats it as an opaque dict; the renderer in
-    ``vibeserve_agent/issue/render.py`` interprets the schema.
+    ``vibe_serve/issue/render.py`` interprets the schema.
     """
 
     timestamp: str

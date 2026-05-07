@@ -12,13 +12,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vibeserve_agent.schemas import (
+from vibe_serve.schemas import (
     ImplementerResponse,
     JudgeResponse,
     ProfilerResponse,
     Verdict,
 )
-from vibeserve_agent.agent_runner import (
+from vibe_serve.agent_runner import (
     _parse_profiler_response_text,
     run_profiler_agent,
 )
@@ -232,7 +232,7 @@ def nsys_db(tmp_path):
 
 
 def test_analyze_kernels(nsys_db):
-    from inputs.nsys_profiler.analyze_nsys import analyze_kernels, _build_string_map
+    from examples.nsys_profiler.analyze_nsys import analyze_kernels, _build_string_map
 
     conn = sqlite3.connect(nsys_db)
     strings = _build_string_map(conn)
@@ -246,7 +246,7 @@ def test_analyze_kernels(nsys_db):
 
 
 def test_analyze_cpu_overhead(nsys_db):
-    from inputs.nsys_profiler.analyze_nsys import analyze_cpu_overhead, _build_string_map
+    from examples.nsys_profiler.analyze_nsys import analyze_cpu_overhead, _build_string_map
 
     conn = sqlite3.connect(nsys_db)
     strings = _build_string_map(conn)
@@ -260,7 +260,7 @@ def test_analyze_cpu_overhead(nsys_db):
 
 
 def test_analyze_gpu_idle_gaps(nsys_db):
-    from inputs.nsys_profiler.analyze_nsys import analyze_gpu_idle_gaps, _build_string_map
+    from examples.nsys_profiler.analyze_nsys import analyze_gpu_idle_gaps, _build_string_map
 
     conn = sqlite3.connect(nsys_db)
     strings = _build_string_map(conn)
@@ -273,7 +273,7 @@ def test_analyze_gpu_idle_gaps(nsys_db):
 
 
 def test_analyze_memory_ops(nsys_db):
-    from inputs.nsys_profiler.analyze_nsys import analyze_memory_ops
+    from examples.nsys_profiler.analyze_nsys import analyze_memory_ops
 
     conn = sqlite3.connect(nsys_db)
     result = analyze_memory_ops(conn)
@@ -283,7 +283,7 @@ def test_analyze_memory_ops(nsys_db):
 
 
 def test_short_kernel_name():
-    from inputs.nsys_profiler.analyze_nsys import _short_kernel_name
+    from examples.nsys_profiler.analyze_nsys import _short_kernel_name
 
     assert _short_kernel_name("void at::native::vectorized_elementwise_kernel<4, float>") == "native::vectorized_elementwise_kernel"
     assert _short_kernel_name("simple_kernel") == "simple_kernel"
