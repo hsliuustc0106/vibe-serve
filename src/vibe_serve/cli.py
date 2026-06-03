@@ -314,6 +314,8 @@ def _resolve_run_dir(run_dir_arg: str) -> str:
 def _resolve_exp_dir(run_dir_arg: str) -> Path:
     """Resolve an experiment name/path, with ``latest`` support."""
     run_dir = _resolve_run_dir(run_dir_arg)
+    if run_dir_arg == "latest":
+        return PROJECT_ROOT / "exp_env" / run_dir
     path = Path(run_dir).expanduser()
     if path.is_dir():
         return path.resolve()

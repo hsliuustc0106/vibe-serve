@@ -59,6 +59,7 @@ def test_build_bundle_uses_best_round_and_copies_workspace_artifacts(tmp_path: P
     assert (result.bundle_dir / "workspace" / "main.py").is_file()
     assert (result.bundle_dir / "artifacts" / "round_summary.json").is_file()
     assert (result.bundle_dir / "artifacts" / "benchmark-result.json").is_file()
+    assert (result.bundle_dir / "artifacts" / "round002.log").is_file()
     assert (result.bundle_dir / "README.md").is_file()
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["selected_round"]["round"] == 2
@@ -96,3 +97,78 @@ def test_build_bundle_requires_an_accepted_round(tmp_path: Path):
 
     with pytest.raises(ValueError, match="no passed or best round"):
         build_accepted_round_bundle(exp_dir)
+
+
+def test_build_bundle_replaces_existing_file_bundle_path(tmp_path: Path):
+    exp_dir = tmp_path / "exp"
+    (exp_dir / "workspace").mkdir(parents=True)
+    _write_json(
+        exp_dir / "logs" / "round_summary.json",
+        {
+            "rounds": [{"round": 1, "status": "passed", "metric_value": 90.0}],
+            "best_round": {"round": 1, "status": "passed", "metric_value": 90.0},
+        },
+    )
+    bundle_path = exp_dir / "bundles" / "round-1"
+    bundle_path.parent.mkdir()
+    bundle_path.write_text("stale file\n", encoding="utf-8")
+
+    result = build_accepted_round_bundle(exp_dir)
+
+    assert result.bundle_dir.is_dir()
+    assert result.manifest_path.is_file()
+
+
+def test_build_bundle_replaces_existing_workspace_file_with_directory(tmp_path: Path):
+    exp_dir = tmp_path / "exp"
+    workspace = exp_dir / "workspace"
+    workspace.mkdir(parents=True)
+    (workspace / "main.py").write_text("print('server')\n", encoding="utf-8")
+    _write_json(
+        exp_dir / "logs" / "round_summary.json",
+        {
+            "rounds": [{"round": 1, "status": "passed", "metric_value": 90.0}],
+            "best_round": {"round": 1, "status": "passed", "metric_value": 90.0},
+        },
+    )
+    output_dir = tmp_path / "out"
+    stale_workspace = output_dir / "round-1" / "workspace"
+    stale_workspace.parent.mkdir(parents=True)
+    stale_workspace.write_text("stale file\n", encoding="utf-8")
+
+    result = build_accepted_round_bundle(exp_dir, output_dir=output_dir)
+
+    assert (result.bundle_dir / "workspace" / "main.py").is_file()
+
+
+def test_build_bundle_readme_uses_unknown_for_none_values(tmp_path: Path):
+    exp_dir = tmp_path / "exp"
+    (exp_dir / "workspace").mkdir(parents=True)
+    _write_json(
+        exp_dir / "logs" / "round_summary.json",
+        {
+            "rounds": [
+                {
+                    "round": 1,
+                    "status": "passed",
+                    "metric_name": None,
+                    "metric_value": None,
+                    "baseline_value": None,
+                }
+            ],
+            "best_round": {
+                "round": 1,
+                "status": "passed",
+                "metric_name": None,
+                "metric_value": None,
+                "baseline_value": None,
+            },
+        },
+    )
+
+    result = build_accepted_round_bundle(exp_dir)
+
+    readme = (result.bundle_dir / "README.md").read_text(encoding="utf-8")
+    assert "- Metric: unknown" in readme
+    assert "- Baseline: unknown" in readme
+    assert "None" not in readme

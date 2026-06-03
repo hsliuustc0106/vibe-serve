@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from vibe_serve.cli import _extract_flag, _extract_loop_selection, main
+from vibe_serve import cli
+from vibe_serve.cli import _extract_flag, _extract_loop_selection, _resolve_exp_dir, main
 
 # ---------------------------------------------------------------------------
 # Flag extraction
@@ -101,3 +103,14 @@ def test_main_routes_bundle_command():
         args = runner.call_args.args[0]
         assert args.run_dir == "my-run"
         assert args.round == 2
+
+
+def test_resolve_exp_dir_latest_ignores_same_named_cwd_directory(tmp_path, monkeypatch):
+    exp_env = tmp_path / "exp_env"
+    latest = exp_env / "20260603-run"
+    latest.mkdir(parents=True)
+    (tmp_path / "20260603-run").mkdir()
+    monkeypatch.setattr(cli, "PROJECT_ROOT", tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    assert _resolve_exp_dir("latest") == Path(tmp_path / "exp_env" / "20260603-run")

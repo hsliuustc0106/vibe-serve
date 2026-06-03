@@ -22,9 +22,12 @@ def _read_json(path: Path) -> Any:
 def _safe_copy(src: Path, dst: Path) -> None:
     if not src.exists():
         return
-    if src.is_dir():
-        if dst.exists():
+    if dst.exists():
+        if dst.is_dir():
             shutil.rmtree(dst)
+        else:
+            dst.unlink()
+    if src.is_dir():
         shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
     else:
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -61,12 +64,17 @@ def _artifact_candidates(log_dir: Path, round_number: int | None) -> list[Path]:
         "judge*.json",
     ]
     if round_number is not None:
+        try:
+            round_number_int = int(round_number)
+            log_pattern = f"round{round_number_int:03d}*.log"
+        except (TypeError, ValueError):
+            log_pattern = f"round*{round_number}*.log"
         patterns.extend(
             [
                 f"*round*{round_number}*benchmark*.json",
                 f"*round*{round_number}*checker*.json",
                 f"*round*{round_number}*accuracy*.json",
-                f"round{round_number:03d}*.log",
+                log_pattern,
             ]
         )
     found: list[Path] = []
@@ -102,8 +110,10 @@ def build_accepted_round_bundle(
     bundle_root = (output_dir or exp_dir / "bundles").expanduser().resolve()
     bundle_dir = bundle_root / suffix
 
-    if bundle_dir.exists():
+    if bundle_dir.is_dir():
         shutil.rmtree(bundle_dir)
+    elif bundle_dir.exists():
+        bundle_dir.unlink()
     bundle_dir.mkdir(parents=True)
 
     _safe_copy(workspace, bundle_dir / "workspace")
@@ -157,13 +167,18 @@ def _detect_entrypoints(workspace: Path) -> dict[str, str]:
 def _write_readme(bundle_dir: Path, manifest: dict[str, Any]) -> None:
     selected = manifest.get("selected_round") or {}
     entrypoints = manifest.get("entrypoints") or {}
+    round_val = selected.get("round")
+    status_val = selected.get("status")
+    metric_val = selected.get("metric_value")
+    metric_name = selected.get("metric_name")
+    baseline_val = selected.get("baseline_value")
     lines = [
         "# Accepted Round Bundle",
         "",
-        f"- Round: {selected.get('round', 'unknown')}",
-        f"- Status: {selected.get('status', 'unknown')}",
-        f"- Metric: {selected.get('metric_value', 'unknown')} {selected.get('metric_name', '')}".rstrip(),
-        f"- Baseline: {selected.get('baseline_value', 'unknown')}",
+        f"- Round: {round_val if round_val is not None else 'unknown'}",
+        f"- Status: {status_val if status_val is not None else 'unknown'}",
+        f"- Metric: {metric_val if metric_val is not None else 'unknown'} {metric_name or ''}".rstrip(),
+        f"- Baseline: {baseline_val if baseline_val is not None else 'unknown'}",
         "",
         "## Contents",
         "",
