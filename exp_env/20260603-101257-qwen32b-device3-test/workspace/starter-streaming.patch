@@ -1,0 +1,171 @@
+diff --git a/main.py b/main.py
+index ac56ad8..97a8408 100644
+--- a/main.py
++++ b/main.py
+@@ -10,7 +10,7 @@ import uuid
+ from contextlib import asynccontextmanager
+ from dataclasses import dataclass
+ from pathlib import Path
+-from typing import Any
++from typing import Any, Callable
+ 
+ import torch
+ import torch.nn as nn
+@@ -360,6 +360,7 @@ class VibeServeModel:
+         max_new_tokens: int,
+         prediction_ids: list[int] | torch.Tensor | None,
+         draft_k: int = SPEC_DRAFT_K,
++        on_tokens: Callable[[list[int]], None] | None = None,
+     ) -> tuple[torch.Tensor, GenerationStats]:
+         input_ids = input_ids.to(self.device, dtype=torch.long)
+         prediction_list = _to_token_list(prediction_ids)
+@@ -379,6 +380,8 @@ class VibeServeModel:
+                 remaining_after_seed = max_new_tokens - len(generated_tokens) - 1
+                 if remaining_after_seed <= 0:
+                     generated_tokens.append(seed)
++                    if on_tokens is not None:
++                        on_tokens([seed])
+                     break
+                 draft = _prediction_ngram_draft(
+                     context=_to_token_list(input_ids[0]) + generated_tokens + [seed],
+@@ -392,6 +395,8 @@ class VibeServeModel:
+                     stats.target_forwards += 1
+                     stats.fallback_tokens += 1
+                     generated_tokens.append(seed)
++                    if on_tokens is not None:
++                        on_tokens([seed])
+                     current_logits = logits[:, -1, :]
+                     continue
+ 
+@@ -418,18 +423,27 @@ class VibeServeModel:
+                 room = max_new_tokens - len(generated_tokens)
+                 bonus = int(target_argmax[accepted])
+                 if bonus in self.eos_token_ids:
+-                    generated_tokens.extend(emitted[:room])
++                    out_tokens = emitted[:room]
++                    generated_tokens.extend(out_tokens)
++                    if on_tokens is not None and out_tokens:
++                        on_tokens(out_tokens)
+                     break
+                 if len(emitted) < room:
+                     emitted.append(bonus)
+                     stats.bonus_tokens += 1
+-                    generated_tokens.extend(emitted[:room])
++                    out_tokens = emitted[:room]
++                    generated_tokens.extend(out_tokens)
++                    if on_tokens is not None and out_tokens:
++                        on_tokens(out_tokens)
+                     bonus_ids = torch.tensor([[bonus]], device=self.device, dtype=torch.long)
+                     logits, past_key_values = self.model(bonus_ids, past_key_values=past_key_values, use_cache=True)
+                     stats.target_forwards += 1
+                     current_logits = logits[:, -1, :]
+                 else:
+-                    generated_tokens.extend(emitted[:room])
++                    out_tokens = emitted[:room]
++                    generated_tokens.extend(out_tokens)
++                    if on_tokens is not None and out_tokens:
++                        on_tokens(out_tokens)
+                     current_logits = logits[:, len(emitted) - 1, :]
+         if generated_tokens:
+             generated = torch.cat(
+@@ -768,17 +782,96 @@ async def _stream_completion(req: CompletionRequest, completion_id: str, created
+     try:
+         async for keepalive in _wait_until_model_ready_for_stream():
+             yield keepalive
+-        async with _generate_lock:
+-            prompt_tokens, _prediction_tokens, _generated_tokens, _elapsed, text = await asyncio.to_thread(_generate_text, req)
+-        if text:
++        assert _served_model is not None and _tokenizer is not None
++        if req.temperature != 0:
++            raise ValueError("This M1 server supports greedy completions only: temperature must be 0")
++
++        input_ids, prompt_tokens, prediction_ids = _tokenize_request(req)
++        queue: asyncio.Queue[str | None] = asyncio.Queue()
++        loop = asyncio.get_running_loop()
++        text_parts: list[str] = []
++        state: dict[str, Any] = {}
++
++        def enqueue_token_text(token_ids: list[int]) -> None:
++            if not token_ids:
++                return
++            piece = _tokenizer.decode(token_ids, skip_special_tokens=True)
++            if piece:
++                text_parts.append(piece)
++                loop.call_soon_threadsafe(queue.put_nowait, piece)
++
++        def generate_worker() -> None:
++            start = time.perf_counter()
++            try:
++                output_ids, spec_stats = _served_model.generate_with_prediction(
++                    input_ids,
++                    max_new_tokens=req.max_tokens,
++                    prediction_ids=prediction_ids,
++                    draft_k=SPEC_DRAFT_K,
++                    on_tokens=enqueue_token_text,
++                )
++                elapsed = time.perf_counter() - start
++                raw_text = "".join(text_parts)
++                text = _apply_stop(_strip_thinking(raw_text), _stop_sequences(req.stop))
++                generated_tokens = _count_text_tokens(text)
++                state.update(
++                    prompt_tokens=prompt_tokens,
++                    prediction_tokens=len(prediction_ids),
++                    generated_tokens=generated_tokens,
++                    elapsed=elapsed,
++                    text=text,
++                    spec_stats=spec_stats,
++                    output_tokens=int(output_ids.shape[-1] - prompt_tokens),
++                )
++            except Exception as exc:
++                state["error"] = exc
++            finally:
++                loop.call_soon_threadsafe(queue.put_nowait, None)
++
++        async def locked_generate() -> None:
++            async with _generate_lock:
++                await asyncio.to_thread(generate_worker)
++
++        task = asyncio.create_task(locked_generate())
++        while True:
++            piece = await queue.get()
++            if piece is None:
++                break
+             payload = {
+                 "id": completion_id,
+                 "object": "text_completion.chunk",
+                 "created": created,
+                 "model": HOSTED_MODEL_NAME,
+-                "choices": [{"text": text, "index": 0, "finish_reason": None}],
++                "choices": [{"text": piece, "index": 0, "finish_reason": None}],
+             }
+             yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
++        await task
++        if "error" in state:
++            raise state["error"]
++
++        text = str(state.get("text", ""))
++        generated_tokens = int(state.get("generated_tokens", 0))
++        elapsed = float(state.get("elapsed", 0.0))
++        spec_stats = state.get("spec_stats", GenerationStats())
++        logger.info(
++            "completion_stats prompt_tokens=%d prediction_tokens=%d generated_tokens=%d elapsed_generation_s=%.6f",
++            prompt_tokens,
++            len(prediction_ids),
++            generated_tokens,
++            elapsed,
++        )
++        logger.info(
++            "spec_stats attempted=%d accepted=%d verifier_steps=%d target_forwards=%d fallback_tokens=%d bonus_tokens=%d cuda_graph_replays=%d attention_backend=%s cuda_graphs_configured=%s",
++            spec_stats.attempted_draft_tokens,
++            spec_stats.accepted_draft_tokens,
++            spec_stats.verifier_steps,
++            spec_stats.target_forwards,
++            spec_stats.fallback_tokens,
++            spec_stats.bonus_tokens,
++            spec_stats.cuda_graph_replays,
++            ATTENTION_BACKEND,
++            ENABLE_CUDA_GRAPHS and torch.cuda.is_available(),
++        )
+         final_payload = {
+             "id": completion_id,
+             "object": "text_completion.chunk",
