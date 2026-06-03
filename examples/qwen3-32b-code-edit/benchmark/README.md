@@ -103,5 +103,5 @@ CUDA_VISIBLE_DEVICES=0 \
 VLLM_MODEL=/model \
 VLLM_BENCH_TOKENIZER=/model \
 VLLM_BENCH_SWEEP_CONCURRENCY=1,2,4,8 \
-  ../baseline/run_vLLM_baseline.sh
+  ../baseline/run_vllm_baseline.sh
 ```
