@@ -92,6 +92,15 @@ examples/<name>/
 
 For multi-objective evolutionary runs, drop an `objectives.toml` next to `OBJECTIVE.md` (or pass `--objective name:max|min` flags) — see `vibe-serve --outer-loop evolve --help`.
 
+## Starter Templates
+
+The agent loop copies reusable starter templates into each workspace under
+`starter_template/`. The default text-generation starter lives at
+`resources/starters/fastapi-transformers/` and provides a conservative FastAPI
+and Hugging Face Transformers baseline with `/health`, `/v1/models`, and
+`/v1/completions`. Agents can adapt this baseline before applying target-specific
+optimizations.
+
 ## Configuration (`agent.toml`)
 
 ```toml
