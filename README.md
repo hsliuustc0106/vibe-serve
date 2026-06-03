@@ -141,6 +141,15 @@ exp_env/<run>/
 └── reference/                # snapshot of --ref at start
 ```
 
+Package the best accepted agent-loop round into a deployable bundle:
+
+```bash
+vibe-serve bundle --run-dir latest
+vibe-serve bundle --run-dir 20260507-... --round 4 --name qwen3-h200
+```
+
+Bundles are written under `exp_env/<run>/bundles/` by default. Each bundle contains the generated `workspace/`, copied benchmark/checker/log artifacts, a `bundle.json` manifest, and a short README with detected server/checker/benchmark entrypoints.
+
 Resume any run with `--resume` (defaults to "latest"):
 
 ```bash

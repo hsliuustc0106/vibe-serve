@@ -24,9 +24,9 @@ from pathlib import Path
 
 from vibe_serve.config import _load_config
 from vibe_serve.constants import (
-    ComputeBackend,
     KNOWN_COMPUTE_BACKENDS,
     PROJECT_ROOT,
+    ComputeBackend,
 )
 from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
@@ -309,6 +309,17 @@ def _resolve_run_dir(run_dir_arg: str) -> str:
         print("Error: no experiment directories found in exp_env/.", file=sys.stderr)
         sys.exit(1)
     return dirs[-1]
+
+
+def _resolve_exp_dir(run_dir_arg: str) -> Path:
+    """Resolve an experiment name/path, with ``latest`` support."""
+    run_dir = _resolve_run_dir(run_dir_arg)
+    if run_dir_arg == "latest":
+        return PROJECT_ROOT / "exp_env" / run_dir
+    path = Path(run_dir).expanduser()
+    if path.is_dir():
+        return path.resolve()
+    return PROJECT_ROOT / "exp_env" / run_dir
 
 
 def _apply_common_args(parser: argparse.ArgumentParser) -> None:
@@ -702,6 +713,59 @@ def _run_plain(args: argparse.Namespace) -> None:
 
 
 # ===========================================================================
+# bundle command
+# ===========================================================================
+
+
+def _build_bundle_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="vibe-serve bundle",
+        description="Package an accepted agent-loop round as a deployable bundle.",
+    )
+    parser.add_argument(
+        "--run-dir",
+        default="latest",
+        help="Experiment directory name under exp_env/, absolute path, or 'latest'.",
+    )
+    parser.add_argument(
+        "--round",
+        type=int,
+        default=None,
+        help="Round to package. Defaults to round_summary.json best_round.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Bundle output root. Defaults to <run-dir>/bundles/.",
+    )
+    parser.add_argument(
+        "--name",
+        default=None,
+        help="Bundle directory name. Defaults to round-<N>.",
+    )
+    return parser
+
+
+def _run_bundle(args: argparse.Namespace) -> None:
+    from vibe_serve.loops.agent.bundle import build_accepted_round_bundle
+
+    try:
+        result = build_accepted_round_bundle(
+            _resolve_exp_dir(args.run_dir),
+            output_dir=args.output_dir,
+            round_number=args.round,
+            name=args.name,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Bundle written: {result.bundle_dir}")
+    print(f"Manifest: {result.manifest_path}")
+
+
+# ===========================================================================
 # Dispatch
 # ===========================================================================
 
@@ -726,6 +790,11 @@ _RUNNERS = {
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "bundle":
+        args = _build_bundle_parser().parse_args(sys.argv[2:])
+        _run_bundle(args)
+        return
+
     loop_kind, remaining = _extract_loop_selection(sys.argv[1:])
     args = _PARSER_BUILDERS[loop_kind]().parse_args(remaining)
     # Resolve validator + runner via globals() so unittest.mock.patch on
