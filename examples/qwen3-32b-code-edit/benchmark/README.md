@@ -1,6 +1,6 @@
 # benchmark/benchmark.py
 
-Single-batch code-edit latency benchmark on `m-a-p/CodeEditorBench` code-debug rows. Drives an OpenAI-compatible `/v1/completions` server with concurrency = 1.
+Code-edit latency benchmark on `m-a-p/CodeEditorBench` code-debug rows. Drives an OpenAI-compatible `/v1/completions` server. The default remains concurrency = 1 for the paper-style single-batch predicted-outputs target, and the benchmark also supports explicit concurrency sweeps for baseline comparison.
 
 ## What it sends
 
@@ -54,3 +54,25 @@ uv run python benchmark.py \
 ```
 
 Default `--languages python3`. To include cpp/java rows: `--languages python3,cpp,java`. Token-level alignment math is cleanest on Python (BPE chunking interacts well with the dataset's whitespace), so default is python3 only.
+
+To compare across load levels, use either a single concurrency:
+
+```bash
+uv run python benchmark.py \
+    --url http://localhost:8000 \
+    --num-samples 64 --warmup 4 \
+    --concurrency 8 \
+    --output-json /tmp/code_edit_c8.json
+```
+
+or a sweep similar to `vllm bench serve`:
+
+```bash
+uv run python benchmark.py \
+    --url http://localhost:8000 \
+    --num-samples 64 --warmup 4 \
+    --sweep-concurrency 1,2,4,8,16,32 \
+    --output-json /tmp/code_edit_sweep.json
+```
+
+Sweep output contains a top-level `summary` table plus per-concurrency run details.

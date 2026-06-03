@@ -453,7 +453,11 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
     if not samples:
         raise SystemExit("No samples could be loaded from CodeEditorBench.")
 
-    print(f"[bench] sending {len(samples)} sequential requests to {url}", file=sys.stderr)
+    print(
+        f"[bench] sending {len(samples)} requests to {url} "
+        f"(concurrency={args.concurrency})",
+        file=sys.stderr,
+    )
     print(
         f"[bench] loading tokenizer for client-side chat templating: {args.tokenizer_path}",
         file=sys.stderr,
@@ -461,25 +465,32 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
     tokenizer = _load_tokenizer(args.tokenizer_path)
 
     results: list[dict] = []
-    async with httpx.AsyncClient() as client:
+    limits = httpx.Limits(
+        max_connections=max(100, args.concurrency),
+        max_keepalive_connections=max(100, args.concurrency),
+    )
+    async with httpx.AsyncClient(limits=limits) as client:
         t_start = time.perf_counter()
+        sem = asyncio.Semaphore(max(1, args.concurrency))
 
-        for idx, sample in enumerate(samples):
+        async def run_one(idx: int, sample: dict) -> dict:
             prompt = _build_prompt(tokenizer, sample)
-            result = await send_request(
-                client, url, prompt,
-                prediction_content=sample["incorrect_code"],
-                max_tokens=args.max_tokens,
-                temperature=args.temperature,
-                tokenizer=tokenizer,
-                model_name=args.model,
-                print_stream=args.print_stream,
-                sample_id=sample["unique_id"],
-            )
+            async with sem:
+                result = await send_request(
+                    client, url, prompt,
+                    prediction_content=sample["incorrect_code"],
+                    max_tokens=args.max_tokens,
+                    temperature=args.temperature,
+                    tokenizer=tokenizer,
+                    model_name=args.model,
+                    print_stream=args.print_stream,
+                    sample_id=sample["unique_id"],
+                )
             result["sample_id"] = sample["unique_id"]
             result["language"] = sample["language"]
             result["bug_type"] = sample["bug_type"]
             result["is_warmup"] = idx < args.warmup
+            result["request_index"] = idx
             if result["error"] is None:
                 # Token-level alignment vs the prediction (the buggy code)
                 # — this is the input the headroom estimator needs.
@@ -496,13 +507,18 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
             else:
                 result["alignment"] = None
                 result["quality"] = None
+            return result
+
+        tasks = [asyncio.create_task(run_one(idx, sample)) for idx, sample in enumerate(samples)]
+        for completed in asyncio.as_completed(tasks):
+            result = await completed
             results.append(result)
 
             align = result["alignment"]
             qual = result["quality"]
             print(
-                f"[bench] sample {idx + 1}/{len(samples)} "
-                f"id={sample['unique_id']} lang={sample['language']} "
+                f"[bench] sample {result['request_index'] + 1}/{len(samples)} "
+                f"id={result['sample_id']} lang={result['language']} "
                 f"tokens={result['output_tokens']} "
                 f"chunks={result['num_chunks']} "
                 f"ttft={(result['ttft'] or 0) * 1000:.0f}ms "
@@ -617,6 +633,7 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
             "languages": languages,
             "num_samples": args.num_samples,
             "warmup": args.warmup,
+            "concurrency": args.concurrency,
             "max_tokens": args.max_tokens,
             "temperature": args.temperature,
             "seed": args.seed,
@@ -643,6 +660,7 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
         "per_sample": [
             {
                 "sample_id": r["sample_id"],
+                "request_index": r["request_index"],
                 "language": r["language"],
                 "bug_type": r["bug_type"],
                 "tokens": r["output_tokens"],
@@ -670,6 +688,59 @@ async def run_benchmark(args: argparse.Namespace) -> dict:
         print(f"\nResults written to {args.output_json}")
 
     return result_dict
+
+
+def _parse_concurrency_sweep(raw: str) -> list[int]:
+    values: list[int] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        value = int(item)
+        if value < 1:
+            raise ValueError("concurrency values must be >= 1")
+        values.append(value)
+    if not values:
+        raise ValueError("empty concurrency sweep")
+    return values
+
+
+async def run_sweep(args: argparse.Namespace) -> dict:
+    output_json = args.output_json
+    concurrencies = _parse_concurrency_sweep(args.sweep_concurrency)
+    runs: list[dict[str, Any]] = []
+    for concurrency in concurrencies:
+        run_args = argparse.Namespace(**vars(args))
+        run_args.concurrency = concurrency
+        run_args.output_json = None
+        run_args.sweep_concurrency = None
+        print()
+        print("#" * 60)
+        print(f"  Concurrency sweep: {concurrency}")
+        print("#" * 60)
+        runs.append(await run_benchmark(run_args))
+
+    summary = [
+        {
+            "concurrency": run["config"]["concurrency"],
+            "num_completed": run["num_completed"],
+            "num_failed": run["num_failed"],
+            "median_tok_per_sec": run["median_tok_per_sec"],
+            "p50_total_latency_ms": run["p50_total_latency_ms"],
+            "actual_duration_sec": run["actual_duration_sec"],
+        }
+        for run in runs
+    ]
+    result = {
+        "primary_metric": "median_tok_per_sec",
+        "sweep_concurrency": concurrencies,
+        "summary": summary,
+        "runs": runs,
+    }
+    if output_json:
+        Path(output_json).write_text(json.dumps(result, indent=2))
+        print(f"\nSweep results written to {output_json}")
+    return result
 
 
 def main() -> None:
@@ -714,6 +785,10 @@ def main() -> None:
                         help="Total samples to send (default: 50).")
     parser.add_argument("--warmup", type=int, default=3,
                         help="Number of leading samples to discard from stats (default: 3).")
+    parser.add_argument("--concurrency", type=int, default=1,
+                        help="Maximum in-flight requests (default: 1).")
+    parser.add_argument("--sweep-concurrency", type=str, default=None,
+                        help="Comma-separated concurrency levels to benchmark, e.g. 1,2,4,8,16.")
     parser.add_argument("--max-tokens", type=int, default=512,
                         help="Max tokens per response (default: 512).")
     parser.add_argument("--temperature", type=float, default=0,
@@ -738,9 +813,17 @@ def main() -> None:
     args = parser.parse_args()
     if args.num_requests is not None:
         args.num_samples = args.num_requests
+    if args.concurrency < 1:
+        raise SystemExit("--concurrency must be >= 1")
     if args.warmup >= args.num_samples:
         args.warmup = max(0, args.num_samples - 1) if args.num_samples > 1 else 0
-    asyncio.run(run_benchmark(args))
+    if args.sweep_concurrency:
+        try:
+            asyncio.run(run_sweep(args))
+        except ValueError as exc:
+            raise SystemExit(f"Invalid --sweep-concurrency: {exc}") from exc
+    else:
+        asyncio.run(run_benchmark(args))
 
 
 if __name__ == "__main__":
