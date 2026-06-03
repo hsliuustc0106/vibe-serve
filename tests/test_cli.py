@@ -9,7 +9,6 @@ import pytest
 
 from vibe_serve.cli import _extract_flag, _extract_loop_selection, main
 
-
 # ---------------------------------------------------------------------------
 # Flag extraction
 # ---------------------------------------------------------------------------
@@ -92,3 +91,13 @@ def test_main_routes_to_runner(loop_name: str, runner_attr: str):
         runner.assert_called_once()
         args = runner.call_args.args[0]
         assert args.exp_name == "x"
+
+
+def test_main_routes_bundle_command():
+    argv = ["vibe-serve", "bundle", "--run-dir", "my-run", "--round", "2"]
+    with patch.object(sys, "argv", argv), patch("vibe_serve.cli._run_bundle") as runner:
+        main()
+        runner.assert_called_once()
+        args = runner.call_args.args[0]
+        assert args.run_dir == "my-run"
+        assert args.round == 2
