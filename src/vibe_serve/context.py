@@ -653,7 +653,7 @@ class _RunContext:
         gitignore.write_text("\n".join(sorted(self.EXCLUDED_WORKSPACE_DIRS)) + "\n")
 
         self._git_run(["git", "add", "-A"])
-        self._git_run(["git", "commit", "m", "initial: workspace setup"])
+        self._git_run(["git", "commit", "-m", "initial: workspace setup"])
 
     def _git_snapshot(self, label: str) -> None:
         """Commit current workspace state with *label* as the commit message."""
