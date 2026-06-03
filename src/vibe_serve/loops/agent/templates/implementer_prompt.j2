@@ -35,6 +35,12 @@ further.
 
 Your working directory is the shared experiment workspace. All files you create must be here. The reference implementation is at `{{ reference_path }}`. Model weights are at `/model` — do NOT download models.
 
+If the workspace does not yet contain a runnable server, start from
+`starter_template/`. It is a conservative FastAPI + Hugging Face Transformers
+baseline with `/health`, `/v1/models`, and `/v1/completions` already wired.
+Copy it into the workspace root, adapt it to the target contract, then optimize
+from there instead of writing a serving stack from scratch.
+
 Use `uv` for Python package management. Run `uv init` if `pyproject.toml` doesn't exist yet, and `uv add` for new dependencies. Always execute scripts via `uv run`.
 
 ## Required: read the relevant skill BEFORE writing code

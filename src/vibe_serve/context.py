@@ -310,6 +310,10 @@ class _RunContext:
                 src = Path(self.torch_profiler_path)
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
 
+            starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
+            if starter_src.is_dir():
+                self._copy_excluding_extras(starter_src, self.workspace / "starter_template")
+
         # Always ensure profiler harnesses are present in the workspace, even
         # when resuming — the original run may not have had them.
         if existing and self.nsys_profiler_path:
@@ -320,6 +324,10 @@ class _RunContext:
             src = Path(self.torch_profiler_path)
             if not (self.workspace / "torch_profiler").exists():
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
+        if existing:
+            starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
+            if starter_src.is_dir() and not (self.workspace / "starter_template").exists():
+                self._copy_excluding_extras(starter_src, self.workspace / "starter_template")
 
         if git_tracking:
             self._init_git_tracking(existing)
