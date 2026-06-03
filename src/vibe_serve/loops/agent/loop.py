@@ -19,6 +19,7 @@ from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
 from vibe_serve.context import _RunContext
 from vibe_serve.loops.agent.goal_contract import load_goal_contract_text
 from vibe_serve.loops.agent import issue_board
+from vibe_serve.loops.agent.round_summary import summarize_rounds
 from vibe_serve.schemas import (
     OrchestratorPlan,
     PreRoundDecision,
@@ -91,6 +92,18 @@ def _load_rounds_state(path: Path) -> list[_RoundRecord]:
 def _save_rounds_state(path: Path, records: list[_RoundRecord]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps([r.to_json() for r in records], indent=2))
+
+
+def _save_round_summary(
+    path: Path,
+    records: list[_RoundRecord],
+    goal_contract_data: dict[str, Any] | None,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(summarize_rounds(records, goal_contract_data), indent=2),
+        encoding="utf-8",
+    )
 
 
 def _best_round(records: list[_RoundRecord]) -> _RoundRecord | None:
@@ -475,7 +488,12 @@ def run_agent_loop(
         acc_checker,
         bench,
     )
+    goal_contract_data: dict[str, Any] | None = None
     if goal_contract_path is not None and goal_contract is not None:
+        try:
+            goal_contract_data = json.loads(goal_contract)
+        except json.JSONDecodeError:
+            goal_contract_data = None
         (ctx.workspace / "goal.json").write_text(
             goal_contract,
             encoding="utf-8",
@@ -489,7 +507,9 @@ def run_agent_loop(
     issue_board.ensure_roadmap_file(roadmap_path)
 
     rounds_state_path = ctx.log_dir / "rounds.json"
+    round_summary_path = ctx.log_dir / "round_summary.json"
     records = _load_rounds_state(rounds_state_path)
+    _save_round_summary(round_summary_path, records, goal_contract_data)
 
     carry = _CarryOver()
     round_number = start_round
@@ -621,6 +641,7 @@ def run_agent_loop(
                 )
             )
             _save_rounds_state(rounds_state_path, records)
+            _save_round_summary(round_summary_path, records, goal_contract_data)
 
             if not passed:
                 issue_board.append_exhaustion_note(
