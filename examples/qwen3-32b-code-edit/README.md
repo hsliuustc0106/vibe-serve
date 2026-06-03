@@ -15,6 +15,7 @@ CodeEditorBench's "code debug" rows hand the model an `incorrect_solutions` (the
 ```
 qwen3-32b-code-edit/
 ├── OBJECTIVE.md                       # the goal handed to vibeserve-orchestrate
+├── goal.json                          # machine-readable target contract
 ├── README.md                          # this file
 ├── benchmark/
 │   ├── benchmark.py                   # /v1/completions driver, single-batch
@@ -22,10 +23,16 @@ qwen3-32b-code-edit/
 ├── accuracy_checker/
 │   ├── checker.py                     # quality gate — prevents echo-input bypass
 │   └── README.md
-└── reference/
-    ├── README.md                      # how to mount the target model
-    └── meta.json                      # pinned model ids
+├── reference/
+│   ├── README.md                      # how to mount the target model
+│   └── meta.json                      # pinned model ids
+└── scripts/
+    ├── run_server.sh                  # start a generated uvicorn engine
+    ├── run_checker.sh                 # run the correctness gate
+    └── run_benchmark.sh               # run the headline benchmark
 ```
+
+`goal.json` is the narrow target contract the agent should optimize against. It records the model, one-device CUDA constraint, required OpenAI-compatible endpoints, correctness gate, benchmark metric, forbidden shortcuts, and staged validation order.
 
 ## Request envelope
 
@@ -49,13 +56,26 @@ The `prediction` field is the OpenAI predicted-outputs format. Servers that don'
 Launch the server, then:
 
 ```bash
-uv run python inputs/qwen3-32b-code-edit/benchmark/benchmark.py \
-    --url http://localhost:8000 --model qwen3-32b \
-    --num-samples 100 \
-    --output-json /tmp/code_edit_baseline.json
+VIBESERVE_URL=http://localhost:8000 \
+  ./examples/qwen3-32b-code-edit/scripts/run_benchmark.sh
 ```
 
 The bench prints the headline `Primary metric: median_tok_per_sec = ...` line and writes per-sample alignment + quality stats to the output JSON.
+
+To run a generated server from an accepted candidate workspace:
+
+```bash
+VIBESERVE_ENGINE_DIR=/path/to/generated/workspace \
+VIBESERVE_APP_MODULE=starter.main:app \
+  ./examples/qwen3-32b-code-edit/scripts/run_server.sh
+```
+
+To run the correctness gate:
+
+```bash
+VIBESERVE_URL=http://localhost:8000 \
+  ./examples/qwen3-32b-code-edit/scripts/run_checker.sh
+```
 
 ## Accuracy gate
 

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "name": "qwen3-32b-code-edit-predicted-outputs",
+  "target": {
+    "model": "Qwen/Qwen3-32B",
+    "tokenizer": "Qwen/Qwen3-32B",
+    "modality": "text_generation",
+    "workload": "CodeEditorBench code_debug predicted-output completions",
+    "hardware": {
+      "device_type": "cuda",
+      "max_devices": 1,
+      "dtype": "bfloat16"
+    }
+  },
+  "interface": {
+    "base_url_env": "VIBESERVE_URL",
+    "required_endpoints": [
+      {
+        "method": "GET",
+        "path": "/health"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/completions"
+      }
+    ],
+    "optional_endpoints": [
+      {
+        "method": "GET",
+        "path": "/v1/models"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/chat/completions"
+      }
+    ],
+    "completion_contract": {
+      "streaming_required": true,
+      "prompt_is_preformatted": true,
+      "prediction_content_required": true,
+      "temperature": 0,
+      "max_tokens": 512
+    }
+  },
+  "correctness": {
+    "checker": "accuracy_checker/checker.py",
+    "required_exit_code": 0,
+    "default_samples": 10,
+    "minimum_gold_similarity": 0.5,
+    "minimum_gold_rate": 0.5,
+    "reject_on_transport_error": true,
+    "reject_on_empty_output": true
+  },
+  "benchmark": {
+    "script": "benchmark/benchmark.py",
+    "primary_metric": "median_tok_per_sec",
+    "higher_is_better": true,
+    "default_samples": 50,
+    "warmup": 3,
+    "benchmark_matrix": [
+      {
+        "name": "single_batch",
+        "concurrency": 1,
+        "num_samples": 50
+      }
+    ]
+  },
+  "baseline": {
+    "engine": "vllm",
+    "description": "Single-device vLLM-compatible serving target for the same endpoint and workload. Populate measured values before judging a run.",
+    "metrics": {
+      "median_tok_per_sec": null,
+      "success_rate": 1.0,
+      "p95_latency_ms": null
+    }
+  },
+  "acceptance": {
+    "checker_must_pass": true,
+    "success_rate": 1.0,
+    "record_primary_metric": true,
+    "compare_against_baseline": true,
+    "package_deployable_engine": true
+  },
+  "forbidden_shortcuts": [
+    "Do not return canned or synthetic completions.",
+    "Do not echo prediction.content verbatim as the final answer.",
+    "Do not bypass model execution with a fast-mode benchmark shortcut.",
+    "Do not edit checker, benchmark, or reference artifacts inside the candidate workspace."
+  ],
+  "staged_validation": [
+    "server_startup",
+    "health_check",
+    "single_completion_smoke",
+    "small_checker_subset",
+    "full_checker",
+    "benchmark_matrix"
+  ]
+}
