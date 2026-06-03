@@ -17,6 +17,7 @@ from typing import Any
 
 from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
 from vibe_serve.context import _RunContext
+from vibe_serve.loops.agent.goal_contract import load_goal_contract_text
 from vibe_serve.loops.agent import issue_board
 from vibe_serve.schemas import (
     OrchestratorPlan,
@@ -256,6 +257,7 @@ def _run_profiler(
     modality: str,
     progress_path: Path,
     objective: str,
+    goal_contract: str | None,
 ) -> ProfilerSummary | None:
     template = (
         "profiler_prompt_torch.j2" if ctx.profiler_kind == "torch"
@@ -270,6 +272,7 @@ def _run_profiler(
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
         objective=objective,
+        goal_contract=goal_contract,
     )
     summary = invoke_profiler(
         ctx,
@@ -293,6 +296,7 @@ def _run_orchestrator_plan(
     progress_path: Path,
     roadmap_text: str,
     plateau_warning: str | None,
+    goal_contract: str | None,
 ) -> OrchestratorPlan:
     system_prompt = render_template(
         "orchestrator_plan_prompt.j2",
@@ -305,6 +309,7 @@ def _run_orchestrator_plan(
         plateau_warning=plateau_warning,
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
+        goal_contract=goal_contract,
     )
     plan = ctx.invoke(
         kind="orchestrator",
@@ -331,6 +336,7 @@ def _run_implementer(
     modality: str,
     feedback: str | None,
     progress_path: Path,
+    goal_contract: str | None,
 ) -> ImplementerResponse:
     system_prompt = render_template(
         "implementer_prompt.j2",
@@ -343,6 +349,7 @@ def _run_implementer(
         feedback=feedback,
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
+        goal_contract=goal_contract,
     )
     response = ctx.invoke(
         kind="implementer",
@@ -372,6 +379,7 @@ def _run_judge(
     modality: str,
     progress_path: Path,
     objective: str,
+    goal_contract: str | None,
 ) -> JudgeResponse:
     system_prompt = render_template(
         "judge_prompt.j2",
@@ -384,6 +392,7 @@ def _run_judge(
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
         objective=objective,
+        goal_contract=goal_contract,
     )
     response = ctx.invoke(
         kind="judge",
@@ -461,6 +470,18 @@ def run_agent_loop(
     ctx.lprint(f"[log] experiment root: {ctx.exp_dir}")
     ctx.lprint(f"[log] objective: {objective.splitlines()[0] if objective else '(empty)'}")
 
+    goal_contract_path, goal_contract = load_goal_contract_text(
+        reference_path,
+        acc_checker,
+        bench,
+    )
+    if goal_contract_path is not None and goal_contract is not None:
+        (ctx.workspace / "goal.json").write_text(
+            goal_contract,
+            encoding="utf-8",
+        )
+        ctx.lprint(f"[log] goal contract: {goal_contract_path}")
+
     progress_path = ctx.workspace / "progress.md"
     issue_board.ensure_progress_file(progress_path)
 
@@ -498,6 +519,7 @@ def run_agent_loop(
                     modality=modality,
                     progress_path=progress_path,
                     objective=objective,
+                    goal_contract=goal_contract,
                 )
 
             # --- Orchestrator plan ---
@@ -512,6 +534,7 @@ def run_agent_loop(
                 progress_path=progress_path,
                 roadmap_text=roadmap_text,
                 plateau_warning=plateau_warning,
+                goal_contract=goal_contract,
             )
 
             # No early stop: the loop always consumes the full max_rounds
@@ -552,6 +575,7 @@ def run_agent_loop(
                     modality=modality,
                     feedback=feedback,
                     progress_path=progress_path,
+                    goal_contract=goal_contract,
                 )
                 ctx.reselect_gpu()
                 verdict = _run_judge(
@@ -562,6 +586,7 @@ def run_agent_loop(
                     modality=modality,
                     progress_path=progress_path,
                     objective=objective,
+                    goal_contract=goal_contract,
                 )
                 if verdict.verdict == Verdict.PASS:
                     passed = True

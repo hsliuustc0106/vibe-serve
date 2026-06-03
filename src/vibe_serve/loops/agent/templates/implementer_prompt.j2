@@ -17,6 +17,20 @@
 
 Note: the Judge also runs a standard accuracy check and benchmark sanity test. Your implementation must pass those in addition to the criteria above.
 
+{% if goal_contract %}
+## Target contract (`goal.json`)
+
+The framework copied the target contract into your workspace as `goal.json`.
+Use it to constrain implementation choices: endpoint scope, device limits,
+correctness gates, benchmark matrix, acceptance criteria, and forbidden
+shortcuts are run-level requirements unless this round's task narrows them
+further.
+
+```json
+{{ goal_contract }}
+```
+{% endif %}
+
 ## Workspace
 
 Your working directory is the shared experiment workspace. All files you create must be here. The reference implementation is at `{{ reference_path }}`. Model weights are at `/model` — do NOT download models.
