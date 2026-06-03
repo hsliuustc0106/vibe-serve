@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 URL="${VIBESERVE_URL:-http://localhost:8000}"
-MODEL="${VIBESERVE_MODEL:-Qwen/Qwen3-32B}"
+MODEL="${VIBESERVE_MODEL:-${SERVED_MODEL_NAME:-${MODEL_ID:-model}}}"
 ENDPOINT="${VIBESERVE_BENCH_ENDPOINT:-/v1/completions}"
-OUT_DIR="${VIBESERVE_BENCH_OUT_DIR:-/tmp/qwen3_code_edit_vllm_bench}"
-UV_ENV="${VIBESERVE_BENCH_UV_ENV:-$ROOT_DIR/.venv-vllm-bench}"
+OUT_DIR="${VIBESERVE_BENCH_OUT_DIR:-./benchmark_results}"
+UV_ENV="${VIBESERVE_BENCH_UV_ENV:-./.venv-vllm-bench}"
 INSTALL_SPEC="${VIBESERVE_BENCH_VLLM_INSTALL_SPEC:-vllm}"
 PYTHON_BIN="${VIBESERVE_BENCH_PYTHON:-python3}"
 

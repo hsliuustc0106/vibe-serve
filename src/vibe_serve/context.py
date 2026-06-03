@@ -311,6 +311,7 @@ class _RunContext:
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
 
             self._copy_starter_template()
+            self._copy_benchmark_runner()
 
         # Always ensure profiler harnesses are present in the workspace, even
         # when resuming — the original run may not have had them.
@@ -324,6 +325,7 @@ class _RunContext:
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
         if existing:
             self._copy_starter_template(skip_if_present=True)
+            self._copy_benchmark_runner(skip_if_present=True)
 
         if git_tracking:
             self._init_git_tracking(existing)
@@ -562,6 +564,14 @@ class _RunContext:
         starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
         if starter_src.is_dir():
             self._copy_excluding_extras(starter_src, dst)
+
+    def _copy_benchmark_runner(self, *, skip_if_present: bool = False) -> None:
+        dst = self.workspace / "run_benchmark.sh"
+        if skip_if_present and dst.exists():
+            return
+        runner_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers" / "run_benchmark.sh"
+        if runner_src.is_file():
+            shutil.copy2(runner_src, dst)
 
     def wait_for_debug(self, step: str) -> None:
         if self.debug:
