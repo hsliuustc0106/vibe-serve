@@ -5,13 +5,14 @@ import json
 import os
 import time
 import uuid
+from threading import Thread
 from typing import Any
 
 import torch
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
 MODEL_ID = os.getenv("MODEL_ID", "gpt2")
 WEIGHTS_DIR = os.getenv("WEIGHTS_DIR", "/model")
@@ -130,7 +131,7 @@ def _completion_payload(prompt_tokens: int, text: str, finish_reason: str = "sto
     }
 
 
-def _generate_text(req: CompletionRequest) -> tuple[int, str]:
+def _generation_inputs(req: CompletionRequest) -> tuple[int, dict[str, Any]]:
     assert _tokenizer is not None and _model is not None
     prompt = _prompt_text(req.prompt)
     encoded = _tokenizer(
@@ -151,31 +152,82 @@ def _generate_text(req: CompletionRequest) -> tuple[int, str]:
     if do_sample:
         generate_kwargs["temperature"] = req.temperature
         generate_kwargs["top_p"] = req.top_p
+    return prompt_tokens, generate_kwargs
+
+
+def _generate_text(req: CompletionRequest) -> tuple[int, str]:
+    assert _tokenizer is not None and _model is not None
+    prompt_tokens, generate_kwargs = _generation_inputs(req)
     with torch.inference_mode():
         output = _model.generate(**generate_kwargs)
-    generated_ids = output[0, encoded["input_ids"].shape[-1]:]
+    generated_ids = output[0, generate_kwargs["input_ids"].shape[-1]:]
     text = _tokenizer.decode(generated_ids, skip_special_tokens=True)
     return prompt_tokens, _apply_stop(text, _stop_sequences(req.stop))
 
 
 async def _stream_completion(req: CompletionRequest):
     completion_id = f"cmpl-{uuid.uuid4().hex}"
+    created = int(time.time())
     try:
-        # NOTE: This streams pre-generated text, not real token-by-token decode.
-        prompt_tokens, text = await asyncio.to_thread(_generate_text, req)
-        for piece in text.splitlines(keepends=True) or [text]:
+        assert _tokenizer is not None and _model is not None
+        prompt_tokens, generate_kwargs = _generation_inputs(req)
+        streamer = TextIteratorStreamer(
+            _tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+        generate_kwargs["streamer"] = streamer
+        text_parts: list[str] = []
+        generation_error: list[BaseException] = []
+
+        def _run_generate() -> None:
+            try:
+                with torch.inference_mode():
+                    _model.generate(**generate_kwargs)
+            except BaseException as exc:
+                generation_error.append(exc)
+                streamer.on_finalized_text("", stream_end=True)
+
+        thread = Thread(target=_run_generate, daemon=True)
+        thread.start()
+
+        def _next_piece() -> str | None:
+            return next(streamer, None)
+
+        stop_sequences = _stop_sequences(req.stop)
+        emitted_len = 0
+        stopped = False
+        while True:
+            piece = await asyncio.to_thread(_next_piece)
+            if piece is None:
+                break
+            if stopped:
+                continue
+            text_parts.append(piece)
+            text = "".join(text_parts)
+            stopped_text = _apply_stop(text, stop_sequences)
+            emit = stopped_text[emitted_len:]
+            emitted_len = len(stopped_text)
+            if stopped_text != text:
+                stopped = True
+            if not emit:
+                continue
             payload = {
                 "id": completion_id,
                 "object": "text_completion.chunk",
-                "created": int(time.time()),
+                "created": created,
                 "model": HOSTED_MODEL_NAME,
-                "choices": [{"text": piece, "index": 0, "finish_reason": None}],
+                "choices": [{"text": emit, "index": 0, "finish_reason": None}],
             }
             yield f"data: {json.dumps(payload)}\n\n"
+        thread.join()
+        if generation_error:
+            raise generation_error[0]
+        text = _apply_stop("".join(text_parts), stop_sequences)
         final_payload = {
             "id": completion_id,
             "object": "text_completion.chunk",
-            "created": int(time.time()),
+            "created": created,
             "model": HOSTED_MODEL_NAME,
             "choices": [{"text": "", "index": 0, "finish_reason": "stop"}],
             "usage": _usage(prompt_tokens, text),
