@@ -26,10 +26,12 @@ qwen3-32b-code-edit/
 ├── reference/
 │   ├── README.md                      # how to mount the target model
 │   └── meta.json                      # pinned model ids
-└── scripts/
+├── scripts/
     ├── run_server.sh                  # start a generated uvicorn engine
     ├── run_checker.sh                 # run the correctness gate
-    └── run_benchmark.sh               # run the headline benchmark
+    └── run_benchmark.sh               # run the vLLM-style headline benchmark
+└── baseline/
+    └── run_vllm_baseline.sh           # create an isolated uv vLLM env and run baseline sweep
 ```
 
 `goal.json` is the narrow target contract the agent should optimize against. It records the model, one-device CUDA constraint, required OpenAI-compatible endpoints, correctness gate, benchmark metric, forbidden shortcuts, and staged validation order.
@@ -61,6 +63,67 @@ VIBESERVE_URL=http://localhost:8000 \
 ```
 
 The bench prints the headline `Primary metric: median_tok_per_sec = ...` line and writes per-sample alignment + quality stats to the output JSON.
+
+`run_benchmark.sh` follows the same load shape as `vllm bench serve` maximum
+throughput runs: `request-rate=inf` with a bounded `max-concurrency`. The
+default remains `max-concurrency=1` for the headline predicted-output score,
+and sweeps are enabled with `VIBESERVE_BENCH_SWEEP_CONCURRENCY`.
+
+```bash
+VIBESERVE_URL=http://localhost:8000 \
+VIBESERVE_BENCH_SWEEP_CONCURRENCY=1,2,4,8,16 \
+  ./examples/qwen3-32b-code-edit/scripts/run_benchmark.sh
+```
+
+## vLLM baseline
+
+Use `baseline/run_vllm_baseline.sh` to measure a vLLM baseline with the same
+CodeEditorBench predicted-output request envelope used by this target. The
+script follows the vLLM online-benchmark workflow: start an OpenAI-compatible
+`vllm serve` process, wait for `/health`, then drive `/v1/completions` with the
+target benchmark.
+
+The baseline intentionally creates an isolated uv environment at
+`examples/qwen3-32b-code-edit/.venv-vllm` and installs the latest `vllm` wheel
+by default, plus the benchmark-side `datasets`, `transformers`, and `httpx`
+dependencies. To pin or test a specific vLLM build, override
+`VLLM_INSTALL_SPEC`, for example `VLLM_INSTALL_SPEC='vllm==0.10.0'` or a wheel
+URL supported by `uv pip install`.
+
+```bash
+# Optional: reuse an already-downloaded local snapshot.
+export VLLM_MODEL=/model
+export VLLM_BENCH_TOKENIZER=/model
+
+# Optional: restrict the server to one visible GPU.
+export CUDA_VISIBLE_DEVICES=0
+
+./examples/qwen3-32b-code-edit/baseline/run_vllm_baseline.sh
+```
+
+Common knobs:
+
+- `VLLM_UV_ENV` — uv virtualenv path for the vLLM installation.
+- `VLLM_INSTALL_SPEC` — package spec installed into that env; defaults to latest `vllm`.
+- `VLLM_MODEL` — model served by vLLM; defaults to `Qwen/Qwen3-32B`.
+- `VLLM_SERVED_MODEL_NAME` — model name sent by the benchmark; defaults to `Qwen/Qwen3-32B`.
+- `VLLM_SERVER_ARGS` — extra arguments appended to `vllm serve`.
+- `VLLM_BENCH_SWEEP_CONCURRENCY` — comma-separated sweep, e.g. `1,2,4,8,16`.
+- `VLLM_BENCH_SAMPLES`, `VLLM_BENCH_WARMUP`, `VLLM_BENCH_MAX_TOKENS` — benchmark size.
+- `VLLM_BENCH_OUT` — output JSON path; defaults to `baseline/vllm_baseline_sweep.json`.
+
+Example vLLM-style sweep:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+VLLM_MODEL=/model \
+VLLM_BENCH_TOKENIZER=/model \
+VLLM_BENCH_SWEEP_CONCURRENCY=1,2,4,8,16 \
+VLLM_BENCH_SAMPLES=64 \
+VLLM_BENCH_WARMUP=4 \
+VLLM_BENCH_MAX_TOKENS=512 \
+  ./examples/qwen3-32b-code-edit/baseline/run_vllm_baseline.sh
+```
 
 To run a generated server from an accepted candidate workspace:
 

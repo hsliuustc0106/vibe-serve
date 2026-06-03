@@ -55,7 +55,9 @@ uv run python benchmark.py \
 
 Default `--languages python3`. To include cpp/java rows: `--languages python3,cpp,java`. Token-level alignment math is cleanest on Python (BPE chunking interacts well with the dataset's whitespace), so default is python3 only.
 
-To compare across load levels, use either a single concurrency:
+The benchmark load shape matches the vLLM online benchmark's maximum-throughput
+pattern: unlimited request rate with bounded in-flight requests. To compare
+across load levels, use either a single concurrency:
 
 ```bash
 uv run python benchmark.py \
@@ -65,7 +67,7 @@ uv run python benchmark.py \
     --output-json /tmp/code_edit_c8.json
 ```
 
-or a sweep similar to `vllm bench serve`:
+or a sweep:
 
 ```bash
 uv run python benchmark.py \
@@ -76,3 +78,30 @@ uv run python benchmark.py \
 ```
 
 Sweep output contains a top-level `summary` table plus per-concurrency run details.
+
+The wrapper `../scripts/run_benchmark.sh` exposes the same idea with
+vLLM-style environment variable names:
+
+```bash
+VIBESERVE_URL=http://localhost:8000 \
+VIBESERVE_BENCH_SWEEP_CONCURRENCY=1,2,4,8,16 \
+  ../scripts/run_benchmark.sh
+```
+
+## vLLM baseline workflow
+
+The target-level baseline helper lives at
+`../baseline/run_vllm_baseline.sh`. It creates a separate uv virtualenv for the
+latest vLLM wheel, starts `vllm serve`, waits for `/health`, and then runs this
+benchmark against vLLM's OpenAI-compatible `/v1/completions` endpoint. It uses
+this benchmark instead of generic ShareGPT so the baseline receives the same
+preformatted CodeEditorBench prompts and `prediction.content` envelope as
+VibeServe-generated engines.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+VLLM_MODEL=/model \
+VLLM_BENCH_TOKENIZER=/model \
+VLLM_BENCH_SWEEP_CONCURRENCY=1,2,4,8 \
+  ../baseline/run_vllm_baseline.sh
+```
