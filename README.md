@@ -50,7 +50,7 @@ cp agent.toml.example agent.toml
 ## Quickstart
 
 ```bash
-# Issue-tracker outer loop, Codex CLI, Docker on local CUDA, 4 rounds
+# Agent loop, Codex CLI, Docker on local CUDA, 4 rounds
 vibe-serve \
   --ref examples/moonshine-streaming/reference \
   --acc-checker examples/moonshine-streaming/accuracy_checker \
@@ -62,9 +62,30 @@ vibe-serve \
   --modality speech_to_text
 ```
 
-`--outer-loop` defaults to `agent`.  Pass `--outer-loop plain` or `--outer-loop evolve` to switch.  See `vibe-serve --outer-loop <kind> --help` for loop-specific flags.
+`--outer-loop` defaults to `agent`. Pass `--outer-loop plain` or
+`--outer-loop evolve` to switch. See `vibe-serve --outer-loop <kind> --help`
+for loop-specific flags.
 
-See `vibe-serve --outer-loop <kind> --help` for loop-specific flags.
+For the Qwen3 predicted-outputs target added as a concrete baseline/comparison
+scenario:
+
+```bash
+vibe-serve \
+  --ref examples/qwen3-32b-code-edit/reference \
+  --acc-checker examples/qwen3-32b-code-edit/accuracy_checker \
+  --bench examples/qwen3-32b-code-edit/benchmark \
+  --exp-name qwen3-code-edit \
+  --docker \
+  --agent-backend cli --cli-provider codex \
+  --max-rounds 4 \
+  --modality text_generation
+```
+
+Monitor a long run from a second terminal:
+
+```bash
+vibe-serve report --run-dir latest --watch --open
+```
 
 A separate entry point exposes the issue MCP server used by the plain loop:
 
@@ -79,6 +100,7 @@ Each evaluation target lives under `examples/<name>/`:
 ```
 examples/<name>/
 ├── OBJECTIVE.md          # free-form deployment goal (model + hardware + workload + interface)
+├── goal.json             # optional machine-readable target contract
 ├── reference/            # reference HuggingFace Transformers implementation
 │   ├── reference.py
 │   ├── config.json
@@ -88,7 +110,18 @@ examples/<name>/
 └── README.md             # human-readable description
 ```
 
-`OBJECTIVE.md` is read at the start of every run and must live next to `--ref` (sibling, not inside). See `examples/Llama-3-8B/`, `examples/moonshine-streaming/`, `examples/qwen3-32b-code-edit/`, `examples/olmo-hybrid-prefix-caching/`, `examples/Llama-3.1-8B-Instruct-MLX-8bit/`, `examples/show-o2-1.5B-HQ-h100/`, and `examples/show-o2-1.5B-HQ-macbook/` for the paper scenarios.
+`OBJECTIVE.md` is read at the start of every run and must live next to `--ref`
+(sibling, not inside). If a sibling or target-root `goal.json` exists, the agent
+loop copies it into the workspace and threads it into the Profiler,
+Orchestrator, Implementer, and Judge prompts. Use `goal.json` for structured
+contracts such as required endpoints, device limits, benchmark matrices,
+baseline metrics, staged validation order, and forbidden shortcuts.
+
+See `examples/Llama-3-8B/`, `examples/moonshine-streaming/`,
+`examples/qwen3-32b-code-edit/`, `examples/olmo-hybrid-prefix-caching/`,
+`examples/Llama-3.1-8B-Instruct-MLX-8bit/`,
+`examples/show-o2-1.5B-HQ-h100/`, and
+`examples/show-o2-1.5B-HQ-macbook/` for concrete targets.
 
 For multi-objective evolutionary runs, drop an `objectives.toml` next to `OBJECTIVE.md` (or pass `--objective name:max|min` flags) — see `vibe-serve --outer-loop evolve --help`.
 
@@ -100,6 +133,12 @@ The agent loop copies reusable starter templates into each workspace under
 and Hugging Face Transformers baseline with `/health`, `/v1/models`, and
 `/v1/completions`. Agents can adapt this baseline before applying target-specific
 optimizations.
+
+This gives the Implementer a runnable Round 0 shape to start from instead of
+spending early rounds rediscovering a basic server. The starter is deliberately
+plain: it loads a tokenizer/model from `/model` or `MODEL_ID`, exposes
+OpenAI-style completions, supports streaming SSE responses, and leaves deeper
+scheduling/speculation/batching optimizations to the agent.
 
 ## Configuration (`agent.toml`)
 
@@ -134,12 +173,19 @@ exp_env/<run>/
 │   ├── run-*-roundNNN.log    # per-round agent log (agent loop)
 │   ├── progress.md           # long-term memory file the Orchestrator reads/edits
 │   ├── rounds.json           # per-round audit
+│   ├── round_summary.json    # baseline comparison + best accepted round
 │   ├── state.json            # cursor (plain loop)
 │   ├── issues.json           # IssueBoard (plain loop)
 │   ├── population.json       # Individual list (evolve loop)
 │   └── docker.log
+├── bundles/                  # accepted-round deployable bundles
+├── reports/                  # static HTML/JSON run reports
 └── reference/                # snapshot of --ref at start
 ```
+
+`round_summary.json` is the stable data layer for monitoring and comparison. It
+records the benchmark contract, every round's pass/fail status, measured metric,
+baseline value, percent delta, and the best accepted round.
 
 Package the best accepted agent-loop round into a deployable bundle:
 
