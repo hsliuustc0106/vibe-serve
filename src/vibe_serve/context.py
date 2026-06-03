@@ -12,7 +12,7 @@ from pathlib import Path
 from vibe_serve import backends
 from vibe_serve.agent_runner import _log_and_print
 from vibe_serve.agents import build_agent_runner
-from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT
+from vibe_serve.constants import DEFAULT_COMPUTE_BACKEND, PROJECT_ROOT, ComputeBackend
 from vibe_serve.llm_client import _build_model
 from vibe_serve.sandbox.run_environment import (
     RunEnvironmentRequest,
@@ -310,9 +310,7 @@ class _RunContext:
                 src = Path(self.torch_profiler_path)
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
 
-            starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
-            if starter_src.is_dir():
-                self._copy_excluding_extras(starter_src, self.workspace / "starter_template")
+            self._copy_starter_template()
 
         # Always ensure profiler harnesses are present in the workspace, even
         # when resuming — the original run may not have had them.
@@ -325,9 +323,7 @@ class _RunContext:
             if not (self.workspace / "torch_profiler").exists():
                 self._copy_excluding_extras(src, self.workspace / "torch_profiler")
         if existing:
-            starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
-            if starter_src.is_dir() and not (self.workspace / "starter_template").exists():
-                self._copy_excluding_extras(starter_src, self.workspace / "starter_template")
+            self._copy_starter_template(skip_if_present=True)
 
         if git_tracking:
             self._init_git_tracking(existing)
@@ -558,6 +554,14 @@ class _RunContext:
             self._remove_external_symlinks(dst)
         else:
             self._replace_external_symlinks(dst)
+
+    def _copy_starter_template(self, *, skip_if_present: bool = False) -> None:
+        dst = self.workspace / "starter_template"
+        if skip_if_present and dst.exists():
+            return
+        starter_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers"
+        if starter_src.is_dir():
+            self._copy_excluding_extras(starter_src, dst)
 
     def wait_for_debug(self, step: str) -> None:
         if self.debug:

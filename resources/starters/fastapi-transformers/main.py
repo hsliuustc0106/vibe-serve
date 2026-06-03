@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-
 MODEL_ID = os.getenv("MODEL_ID", "gpt2")
 WEIGHTS_DIR = os.getenv("WEIGHTS_DIR", "/model")
 HOSTED_MODEL_NAME = os.getenv("SERVED_MODEL_NAME", MODEL_ID)
@@ -25,6 +24,7 @@ MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", "4096"))
 class CompletionRequest(BaseModel):
     model: str | None = None
     prompt: str | list[str]
+    prediction: Any | None = None
     max_tokens: int = Field(default=128, ge=1)
     temperature: float = Field(default=0.0, ge=0.0)
     top_p: float = Field(default=1.0, gt=0.0, le=1.0)
@@ -63,16 +63,21 @@ async def _ensure_loaded() -> None:
         if _tokenizer is not None and _model is not None:
             return
         source = _model_source()
-        _tokenizer = AutoTokenizer.from_pretrained(source, trust_remote_code=True)
-        if _tokenizer.pad_token_id is None and _tokenizer.eos_token_id is not None:
-            _tokenizer.pad_token = _tokenizer.eos_token
-        _model = AutoModelForCausalLM.from_pretrained(
-            source,
-            torch_dtype=_torch_dtype(),
-            trust_remote_code=True,
-        )
-        _model.to(DEVICE)
-        _model.eval()
+
+        def _load_model() -> tuple[Any, Any]:
+            tokenizer = AutoTokenizer.from_pretrained(source, trust_remote_code=True)
+            if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+                tokenizer.pad_token = tokenizer.eos_token
+            model = AutoModelForCausalLM.from_pretrained(
+                source,
+                torch_dtype=_torch_dtype(),
+                trust_remote_code=True,
+            )
+            model.to(DEVICE)
+            model.eval()
+            return tokenizer, model
+
+        _tokenizer, _model = await asyncio.to_thread(_load_model)
 
 
 def _prompt_text(prompt: str | list[str]) -> str:
@@ -100,9 +105,12 @@ def _apply_stop(text: str, stops: list[str]) -> str:
     return text[:cut]
 
 
-def _usage(prompt: str, completion: str) -> dict[str, int]:
+def _usage(prompt: str | int, completion: str) -> dict[str, int]:
     assert _tokenizer is not None
-    prompt_tokens = len(_tokenizer.encode(prompt, add_special_tokens=False))
+    if isinstance(prompt, int):
+        prompt_tokens = prompt
+    else:
+        prompt_tokens = len(_tokenizer.encode(prompt, add_special_tokens=False))
     completion_tokens = len(_tokenizer.encode(completion, add_special_tokens=False))
     return {
         "prompt_tokens": prompt_tokens,
@@ -111,18 +119,18 @@ def _usage(prompt: str, completion: str) -> dict[str, int]:
     }
 
 
-def _completion_payload(prompt: str, text: str, finish_reason: str = "stop") -> dict[str, Any]:
+def _completion_payload(prompt_tokens: int, text: str, finish_reason: str = "stop") -> dict[str, Any]:
     return {
         "id": f"cmpl-{uuid.uuid4().hex}",
         "object": "text_completion",
         "created": int(time.time()),
         "model": HOSTED_MODEL_NAME,
         "choices": [{"text": text, "index": 0, "finish_reason": finish_reason}],
-        "usage": _usage(prompt, text),
+        "usage": _usage(prompt_tokens, text),
     }
 
 
-def _generate_text(req: CompletionRequest) -> tuple[str, str]:
+def _generate_text(req: CompletionRequest) -> tuple[int, str]:
     assert _tokenizer is not None and _model is not None
     prompt = _prompt_text(req.prompt)
     encoded = _tokenizer(
@@ -130,8 +138,8 @@ def _generate_text(req: CompletionRequest) -> tuple[str, str]:
         return_tensors="pt",
         truncation=True,
         max_length=MAX_INPUT_TOKENS,
-    )
-    encoded = {key: value.to(DEVICE) for key, value in encoded.items()}
+    ).to(DEVICE)
+    prompt_tokens = int(encoded["input_ids"].shape[-1])
     do_sample = req.temperature > 0
     generate_kwargs: dict[str, Any] = {
         **encoded,
@@ -147,30 +155,42 @@ def _generate_text(req: CompletionRequest) -> tuple[str, str]:
         output = _model.generate(**generate_kwargs)
     generated_ids = output[0, encoded["input_ids"].shape[-1]:]
     text = _tokenizer.decode(generated_ids, skip_special_tokens=True)
-    return prompt, _apply_stop(text, _stop_sequences(req.stop))
+    return prompt_tokens, _apply_stop(text, _stop_sequences(req.stop))
 
 
 async def _stream_completion(req: CompletionRequest):
-    prompt, text = await asyncio.to_thread(_generate_text, req)
-    for piece in text.splitlines(keepends=True) or [text]:
-        payload = {
-            "id": f"cmpl-{uuid.uuid4().hex}",
+    completion_id = f"cmpl-{uuid.uuid4().hex}"
+    try:
+        # NOTE: This streams pre-generated text, not real token-by-token decode.
+        prompt_tokens, text = await asyncio.to_thread(_generate_text, req)
+        for piece in text.splitlines(keepends=True) or [text]:
+            payload = {
+                "id": completion_id,
+                "object": "text_completion.chunk",
+                "created": int(time.time()),
+                "model": HOSTED_MODEL_NAME,
+                "choices": [{"text": piece, "index": 0, "finish_reason": None}],
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+        final_payload = {
+            "id": completion_id,
             "object": "text_completion.chunk",
             "created": int(time.time()),
             "model": HOSTED_MODEL_NAME,
-            "choices": [{"text": piece, "index": 0, "finish_reason": None}],
+            "choices": [{"text": "", "index": 0, "finish_reason": "stop"}],
+            "usage": _usage(prompt_tokens, text),
         }
-        yield f"data: {json.dumps(payload)}\n\n"
-    final_payload = {
-        "id": f"cmpl-{uuid.uuid4().hex}",
-        "object": "text_completion.chunk",
-        "created": int(time.time()),
-        "model": HOSTED_MODEL_NAME,
-        "choices": [{"text": "", "index": 0, "finish_reason": "stop"}],
-        "usage": _usage(prompt, text),
-    }
-    yield f"data: {json.dumps(final_payload)}\n\n"
-    yield "data: [DONE]\n\n"
+        yield f"data: {json.dumps(final_payload)}\n\n"
+        yield "data: [DONE]\n\n"
+    except Exception as exc:
+        error_payload = {
+            "error": {
+                "type": "inference_error",
+                "message": str(exc),
+            }
+        }
+        yield f"data: {json.dumps(error_payload)}\n\n"
+        yield "data: [DONE]\n\n"
 
 
 @app.get("/health")
@@ -207,8 +227,8 @@ async def completions(request: Request):
         await _ensure_loaded()
         if req.stream:
             return StreamingResponse(_stream_completion(req), media_type="text/event-stream")
-        prompt, text = await asyncio.to_thread(_generate_text, req)
-        return JSONResponse(_completion_payload(prompt, text))
+        prompt_tokens, text = await asyncio.to_thread(_generate_text, req)
+        return JSONResponse(_completion_payload(prompt_tokens, text))
     except Exception as exc:
         return JSONResponse(
             status_code=500,

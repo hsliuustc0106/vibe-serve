@@ -1,9 +1,9 @@
 from pathlib import Path
 
+import vibe_serve.loops.agent as agent_loop_pkg
 from vibe_serve.prompts import render_template
 
-
-TEMPLATE_DIR = Path(__file__).resolve().parents[3] / "src" / "vibe_serve" / "loops" / "agent" / "templates"
+TEMPLATE_DIR = Path(agent_loop_pkg.__file__).resolve().parent / "templates"
 
 
 def test_implementer_prompt_mentions_starter_template():
