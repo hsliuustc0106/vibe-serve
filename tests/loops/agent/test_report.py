@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from vibe_serve.loops.agent.report import build_agent_report, load_report_data
+from vibe_serve.loops.agent.report import build_agent_report, load_report_data, render_report_html
 
 
 def _write_json(path: Path, data: object) -> None:
@@ -108,10 +108,27 @@ def test_build_agent_report_writes_html_and_data(tmp_path: Path):
     data = json.loads(result.data_path.read_text(encoding="utf-8"))
     assert "Agent Run Report" in html
     assert "Round Progress" in html
-    assert "Metric (tok/s)" in html
+    assert "tokens_per_sec" in html
+    assert "<th>Metric</th>" in html
     assert "Recent Agent Events" in html
     assert 'class="event implementer split"' in html
     assert "<summary>Recent Usage</summary>" in html
     assert "<summary>Benchmark Artifacts</summary>" in html
     assert "<details open>" not in html
     assert data["best_round"]["round"] == 2
+
+
+def test_render_report_handles_blank_agent_names():
+    html = render_report_html(
+        {
+            "benchmark": {},
+            "rounds": [],
+            "best_round": None,
+            "events": [{"agent": "   ", "title": "Round 1", "body": "blank agent"}],
+            "usage": [],
+            "artifacts": [],
+        }
+    )
+
+    assert 'class="event event"' in html
+    assert "blank agent" in html

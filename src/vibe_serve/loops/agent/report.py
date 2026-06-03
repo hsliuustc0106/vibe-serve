@@ -185,7 +185,9 @@ def _summary_section(
 ) -> str:
     source = html.escape(str(data.get("source_experiment", "unknown")))
     baseline_engine = html.escape(_fmt(benchmark.get("baseline_engine")))
-    primary_metric = html.escape(_fmt(benchmark.get("primary_metric")))
+    primary_metric_raw = benchmark.get("primary_metric")
+    primary_metric = html.escape(_fmt(primary_metric_raw))
+    metric_label = html.escape(str(primary_metric_raw)) if primary_metric_raw else "Metric Value"
     baseline_value = html.escape(_fmt(benchmark.get("baseline_value")))
     best_round = html.escape(_fmt(best.get("round") if best else None))
     best_metric = html.escape(_fmt(best.get("metric_value") if best else None))
@@ -198,7 +200,7 @@ def _summary_section(
   <div class="stats">
     <div><span>Rounds</span><strong>{len(rounds)}</strong></div>
     <div><span>Best Round</span><strong>{best_round}</strong></div>
-    <div><span>Metric (tok/s)</span><strong>{best_metric}</strong></div>
+    <div><span>{metric_label}</span><strong>{best_metric}</strong></div>
     <div><span>Baseline</span><strong>{baseline_value}</strong><small>{baseline_engine}</small></div>
   </div>
   <p class="muted">Primary metric: {primary_metric}</p>
@@ -229,7 +231,7 @@ def _rounds_section(rounds: list[Any]) -> str:
   <h2>Round Progress</h2>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Round</th><th>Status</th><th>Metric (tok/s)</th><th>Value</th><th>Baseline</th><th>Delta</th><th>Commit</th></tr></thead>
+      <thead><tr><th>Round</th><th>Status</th><th>Metric</th><th>Value</th><th>Baseline</th><th>Delta</th><th>Commit</th></tr></thead>
       <tbody>{body}</tbody>
     </table>
   </div>
@@ -249,8 +251,10 @@ def _events_section(events: list[Any]) -> str:
             agent = str(event.get("agent") or "Event")
             split = " split" if last_agent is not None and agent != last_agent else ""
             last_agent = agent
+            agent_words = agent.lower().split()
+            agent_class = agent_words[0] if agent_words else "event"
             parts.append(
-                f'<article class="event {agent.lower().split()[0]}{split}">'
+                f'<article class="event {agent_class}{split}">'
                 f"<header><span>{html.escape(agent)}</span><strong>{html.escape(str(event.get('title', 'Event')))}</strong></header>"
                 f"<pre>{html.escape(str(event.get('body') or ''))}</pre>"
                 "</article>"
