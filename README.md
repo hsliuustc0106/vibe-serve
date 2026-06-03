@@ -154,9 +154,10 @@ Generate a static report for an agent-loop run:
 
 ```bash
 vibe-serve report --run-dir latest
+vibe-serve report --run-dir latest --watch --open
 ```
 
-Reports are written under `exp_env/<run>/reports/` by default. The HTML report summarizes baseline comparison, per-round status and metrics, recent agent events from `progress.md`, usage JSON, and benchmark artifacts, with debug-heavy sections collapsed by default.
+Reports are written under `exp_env/<run>/reports/` by default. The HTML report summarizes baseline comparison, per-round status and metrics, recent agent events from `progress.md`, usage JSON, and benchmark artifacts, with debug-heavy sections collapsed by default. Use `--watch` to refresh the report while a loop is running, and `--open` to open the generated HTML in your browser.
 
 Resume any run with `--resume` (defaults to "latest"):
 

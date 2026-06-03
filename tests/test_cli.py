@@ -106,13 +106,27 @@ def test_main_routes_bundle_command():
 
 
 def test_main_routes_report_command():
-    argv = ["vibe-serve", "report", "--run-dir", "my-run", "--output", "report.html"]
+    argv = [
+        "vibe-serve",
+        "report",
+        "--run-dir",
+        "my-run",
+        "--output",
+        "report.html",
+        "--watch",
+        "--interval",
+        "2",
+        "--open",
+    ]
     with patch.object(sys, "argv", argv), patch("vibe_serve.cli._run_report") as runner:
         main()
         runner.assert_called_once()
         args = runner.call_args.args[0]
         assert args.run_dir == "my-run"
         assert args.output == Path("report.html")
+        assert args.watch is True
+        assert args.interval == 2
+        assert args.open is True
 
 
 def test_resolve_exp_dir_latest_ignores_same_named_cwd_directory(tmp_path, monkeypatch):
