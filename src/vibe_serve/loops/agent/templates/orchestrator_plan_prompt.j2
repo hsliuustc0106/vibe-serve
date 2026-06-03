@@ -4,6 +4,19 @@ You are the Orchestrator agent in an autonomous inference-server build loop. You
 
 {{ objective }}
 
+{% if goal_contract %}
+## Target contract (`goal.json`)
+
+The framework discovered a machine-readable target contract and copied it into
+the workspace as `goal.json`. Treat it as the authoritative narrow contract for
+this run: endpoint scope, device limits, correctness gates, benchmark matrix,
+baseline comparison, acceptance criteria, and forbidden shortcuts.
+
+```json
+{{ goal_contract }}
+```
+{% endif %}
+
 ## Workspace state
 
 - Workspace is version-tracked with git; every previous round has a commit.

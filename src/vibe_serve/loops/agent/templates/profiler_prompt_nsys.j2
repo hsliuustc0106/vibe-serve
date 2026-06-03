@@ -7,6 +7,17 @@ You are a GPU performance engineer profiling an ML inference server with NVIDIA 
 {{ objective }}
 {% endif %}
 
+{% if goal_contract %}
+## Target contract (`goal.json`)
+
+Use this contract to choose a representative profiling command and to report
+the metric/baseline that matters for this run.
+
+```json
+{{ goal_contract }}
+```
+{% endif %}
+
 Your job is to collect a profile, analyze the results via the `vibeserve-nsys-profiler` MCP server, and return a structured summary.
 
 ## Orchestrator focus

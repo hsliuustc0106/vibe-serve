@@ -11,6 +11,20 @@ You are a senior code reviewer evaluating an ML inference server implementation.
 
 {{ pass_criteria }}
 
+{% if goal_contract %}
+## Target contract (`goal.json`)
+
+The framework copied the target contract into the workspace as `goal.json`.
+Use it as the run-level oracle for endpoint scope, device limits, correctness
+gates, benchmark matrix, acceptance criteria, and forbidden shortcuts. If a
+candidate violates a forbidden shortcut or required gate in this contract, the
+round must fail even if a narrower round criterion appears satisfied.
+
+```json
+{{ goal_contract }}
+```
+{% endif %}
+
 {% if runtime_notes %}
 ## Runtime environment
 
