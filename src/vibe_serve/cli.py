@@ -19,7 +19,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import tomllib
+import webbrowser
 from pathlib import Path
 
 from vibe_serve.config import _load_config
@@ -766,6 +768,90 @@ def _run_bundle(args: argparse.Namespace) -> None:
 
 
 # ===========================================================================
+# report command
+# ===========================================================================
+
+
+def _build_report_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="vibe-serve report",
+        description="Generate a static agent-loop report from run JSON artifacts.",
+    )
+    parser.add_argument(
+        "--run-dir",
+        default="latest",
+        help="Experiment directory name under exp_env/, absolute path, or 'latest'.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="HTML output path. Defaults to <run-dir>/reports/report.html.",
+    )
+    parser.add_argument(
+        "--data-output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to <run-dir>/reports/report.json.",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Regenerate the report until interrupted.",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=5.0,
+        help="Seconds between regenerations when --watch is set. Default: 5.",
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the generated HTML report in the default browser.",
+    )
+    return parser
+
+
+def _write_report_once(args: argparse.Namespace):
+    from vibe_serve.loops.agent.report import build_agent_report
+
+    return build_agent_report(
+        _resolve_exp_dir(args.run_dir),
+        output_path=args.output,
+        data_path=args.data_output,
+    )
+
+
+def _run_report(args: argparse.Namespace) -> None:
+    if args.interval <= 0:
+        print("Error: --interval must be > 0.", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        result = _write_report_once(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Report written: {result.report_path}")
+    print(f"Report data: {result.data_path}")
+    if args.open:
+        webbrowser.open(result.report_path.as_uri())
+    if not args.watch:
+        return
+
+    print(f"Watching run artifacts every {args.interval:g}s. Press Ctrl-C to stop.")
+    try:
+        while True:
+            time.sleep(args.interval)
+            result = _write_report_once(args)
+            print(f"Report refreshed: {result.report_path}")
+    except KeyboardInterrupt:
+        print("\nStopped report watcher.")
+
+
+# ===========================================================================
 # Dispatch
 # ===========================================================================
 
@@ -793,6 +879,10 @@ def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "bundle":
         args = _build_bundle_parser().parse_args(sys.argv[2:])
         _run_bundle(args)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "report":
+        args = _build_report_parser().parse_args(sys.argv[2:])
+        _run_report(args)
         return
 
     loop_kind, remaining = _extract_loop_selection(sys.argv[1:])

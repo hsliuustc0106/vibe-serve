@@ -150,6 +150,15 @@ vibe-serve bundle --run-dir 20260507-... --round 4 --name qwen3-h200
 
 Bundles are written under `exp_env/<run>/bundles/` by default. Each bundle contains the generated `workspace/`, copied benchmark/checker/log artifacts, a `bundle.json` manifest, and a short README with detected server/checker/benchmark entrypoints.
 
+Generate a static report for an agent-loop run:
+
+```bash
+vibe-serve report --run-dir latest
+vibe-serve report --run-dir latest --watch --open
+```
+
+Reports are written under `exp_env/<run>/reports/` by default. The HTML report summarizes baseline comparison, per-round status and metrics, recent agent events from `progress.md`, usage JSON, and benchmark artifacts, with debug-heavy sections collapsed by default. Use `--watch` to refresh the report while a loop is running, and `--open` to open the generated HTML in your browser.
+
 Resume any run with `--resume` (defaults to "latest"):
 
 ```bash
