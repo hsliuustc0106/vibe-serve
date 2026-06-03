@@ -13,14 +13,9 @@ VLLM_DTYPE="${VLLM_DTYPE:-bfloat16}"
 VLLM_MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-32768}"
 VLLM_READY_TIMEOUT="${VLLM_READY_TIMEOUT:-900}"
 
-BENCH_SAMPLES="${VLLM_BENCH_SAMPLES:-50}"
-BENCH_WARMUP="${VLLM_BENCH_WARMUP:-3}"
-BENCH_MAX_TOKENS="${VLLM_BENCH_MAX_TOKENS:-512}"
-BENCH_SWEEP_CONCURRENCY="${VLLM_BENCH_SWEEP_CONCURRENCY:-1}"
-BENCH_OUT="${VLLM_BENCH_OUT:-$ROOT_DIR/baseline/vllm_baseline_sweep.json}"
-BENCH_TOKENIZER="${VLLM_BENCH_TOKENIZER:-$VLLM_MODEL}"
+BENCH_OUT_DIR="${VLLM_BENCH_OUT_DIR:-$ROOT_DIR/baseline/vllm_bench_results}"
 
-mkdir -p "$(dirname "$BENCH_OUT")"
+mkdir -p "$BENCH_OUT_DIR"
 
 if [[ ! -x "$VLLM_UV_ENV/bin/python" ]]; then
   uv venv --python "${VLLM_PYTHON:-python3}" "$VLLM_UV_ENV"
@@ -70,16 +65,11 @@ until curl -fsS "http://$VLLM_HOST:$VLLM_PORT/health" >/dev/null 2>&1; do
   sleep 2
 done
 
-cd "$ROOT_DIR"
-"$VLLM_UV_ENV/bin/python" benchmark/benchmark.py \
-  --url "http://$VLLM_HOST:$VLLM_PORT" \
-  --model "$VLLM_SERVED_MODEL_NAME" \
-  --tokenizer-path "$BENCH_TOKENIZER" \
-  --num-samples "$BENCH_SAMPLES" \
-  --warmup "$BENCH_WARMUP" \
-  --max-tokens "$BENCH_MAX_TOKENS" \
-  --sweep-concurrency "$BENCH_SWEEP_CONCURRENCY" \
-  --output-json "$BENCH_OUT"
+VIBESERVE_URL="http://$VLLM_HOST:$VLLM_PORT" \
+VIBESERVE_MODEL="$VLLM_SERVED_MODEL_NAME" \
+VIBESERVE_BENCH_UV_ENV="$VLLM_UV_ENV" \
+VIBESERVE_BENCH_OUT_DIR="$BENCH_OUT_DIR" \
+  "$ROOT_DIR/scripts/run_benchmark.sh"
 
-echo "vLLM baseline result: $BENCH_OUT"
+echo "vLLM baseline results: $BENCH_OUT_DIR"
 echo "vLLM server log: $SERVER_LOG"
