@@ -475,9 +475,9 @@ def run_agent_loop(
         acc_checker,
         bench,
     )
-    if goal_contract_path is not None:
+    if goal_contract_path is not None and goal_contract is not None:
         (ctx.workspace / "goal.json").write_text(
-            goal_contract_path.read_text(encoding="utf-8"),
+            goal_contract,
             encoding="utf-8",
         )
         ctx.lprint(f"[log] goal contract: {goal_contract_path}")
