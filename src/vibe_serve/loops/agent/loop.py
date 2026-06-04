@@ -122,16 +122,6 @@ def _save_round_summary(
     )
 
 
-def _best_round(records: list[_RoundRecord]) -> _RoundRecord | None:
-    best: _RoundRecord | None = None
-    for r in records:
-        if r.perf_metric is None or not r.passed:
-            continue
-        if best is None or r.perf_metric > best.perf_metric:
-            best = r
-    return best
-
-
 def _record_metric(record: _RoundRecord | dict[str, Any]) -> float | None:
     if isinstance(record, dict):
         judge_metric = record.get("judge_perf_metric")
@@ -157,6 +147,15 @@ def _record_round_number(record: _RoundRecord | dict[str, Any]) -> int | None:
 
 
 def _numeric_from_text(text: str, metric_name: str | None) -> float | None:
+    """Extract a numeric value for *metric_name* from unstructured LLM text.
+
+    Returns the last match from the first matching pattern group, excluding
+    values that appear in threshold context (``>=``, ``<=``). When the text
+    contains several non-threshold numbers near the metric name, ``matches[-1]``
+    is used as a best-effort tie-breaker. If extraction errors surface in
+    practice, consider preferring the number closest to the ``observed`` or
+    ``measured`` keyword instead.
+    """
     if not metric_name:
         return None
     escaped = re.escape(metric_name)
@@ -923,7 +922,6 @@ def run_agent_loop(
                 carry.exhaustion_info = None
                 current_metric = judge_perf_metric if judge_perf_metric is not None else perf_metric
                 if current_metric is not None:
-                    current_metric = judge_perf_metric if judge_perf_metric is not None else perf_metric
                     best_round_no, best_metric, best_metric_name = _best_measured_metric(
                         records[:-1],
                         higher_is_better=_higher_is_better(goal_contract_data),
