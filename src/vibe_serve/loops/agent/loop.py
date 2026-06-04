@@ -144,6 +144,11 @@ def _record_round_number(record: _RoundRecord | dict[str, Any]) -> int | None:
         return None
 
 
+def _has_measured_round(records: list[_RoundRecord]) -> bool:
+    """Whether any recorded round has a usable headline metric."""
+    return any(_record_metric(r) is not None for r in records)
+
+
 def _numeric_from_text(text: str, metric_name: str | None) -> float | None:
     """Extract a numeric value for *metric_name* from unstructured LLM text.
 
@@ -975,7 +980,10 @@ def run_agent_loop(
 
             if not passed:
                 issue_board.append_exhaustion_note(
-                    progress_path, round_number, max_retries_per_round, feedback or "",
+                    progress_path,
+                    round_number,
+                    max_retries_per_round,
+                    feedback or "",
                 )
                 carry.exhaustion_info = (
                     f"Round {round_number} did not pass after "
@@ -1006,23 +1014,28 @@ def run_agent_loop(
                             f"at round {best_round_no}."
                         )
 
-            round_summary_text = json.dumps(
-                summarize_rounds(records, goal_contract_data),
-                indent=2,
-            )
-            systems_review = _run_systems_reviewer(
-                ctx,
-                round_number=round_number,
-                objective=objective,
-                progress_path=progress_path,
-                roadmap_text=issue_board.read_roadmap(roadmap_path),
-                goal_contract=goal_contract,
-                benchmark_context=_benchmark_context(records, goal_contract_data),
-                round_summary=round_summary_text,
-            )
-            carry.systems_review_info = issue_board.format_systems_review(
-                systems_review
-            )
+            if (
+                round_number < max_rounds
+                and not _is_fresh_cold_start(round_number, records)
+                and _has_measured_round(records)
+            ):
+                round_summary_text = json.dumps(
+                    summarize_rounds(records, goal_contract_data),
+                    indent=2,
+                )
+                systems_review = _run_systems_reviewer(
+                    ctx,
+                    round_number=round_number,
+                    objective=objective,
+                    progress_path=progress_path,
+                    roadmap_text=issue_board.read_roadmap(roadmap_path),
+                    goal_contract=goal_contract,
+                    benchmark_context=_benchmark_context(records, goal_contract_data),
+                    round_summary=round_summary_text,
+                )
+                carry.systems_review_info = issue_board.format_systems_review(
+                    systems_review
+                )
 
             round_number += 1
 

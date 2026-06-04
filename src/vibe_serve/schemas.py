@@ -24,7 +24,7 @@ This module has no local imports, so templates and tests can pull
 schemas in without dragging in the rest of the agent runtime.
 """
 
-from enum import StrEnum
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -33,12 +33,12 @@ from pydantic import BaseModel, Field
 # ===========================================================================
 
 
-class Verdict(StrEnum):
+class Verdict(Enum):
     PASS = "pass"
     FAIL = "fail"
 
 
-class PerfTrend(StrEnum):
+class PerfTrend(Enum):
     IMPROVED = "improved"
     REGRESSED = "regressed"
     MIXED = "mixed"
@@ -345,6 +345,7 @@ class SystemsReviewResponse(BaseModel):
     )
     top_bottlenecks: list[SystemsBottleneck] = Field(
         default_factory=list,
+        min_length=1,
         description="Ranked missing systems capabilities or hot-path bottlenecks.",
     )
     hot_path_audit: SystemsHotPathAudit = Field(

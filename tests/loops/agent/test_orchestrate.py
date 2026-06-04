@@ -405,10 +405,31 @@ def test_loop_systems_review_carries_to_next_orchestrator_plan(tmp_path, ref_fil
                 reasoning="cold start",
             ),
             OrchestratorPlan(
+                task="Enable baseline instrumentation",
+                pass_criteria="profiler summary includes metrics",
+                reasoning="second round captures perf signal before systems review",
+            ),
+            OrchestratorPlan(
                 task="Implement paged KV scheduler",
                 pass_criteria="benchmark improves tokens/sec",
                 reasoning="systems review identified scheduler gap",
             ),
+        ],
+        pre_decisions=[
+            PreRoundDecision(
+                need_profile=True,
+                profile_focus="baseline throughput gate",
+                reasoning="collect first measurable signal",
+            )
+        ],
+        profiler_responses=[
+            ProfilerSummary(
+                analysis="good baseline",
+                bottlenecks="none",
+                suggestions="none",
+                perf_metric=20.0,
+                perf_unit="tok/s",
+            )
         ],
         systems_reviews=[
             SystemsReviewResponse(
@@ -451,12 +472,12 @@ def test_loop_systems_review_carries_to_next_orchestrator_plan(tmp_path, ref_fil
 
     runner.invoke.side_effect = spy_invoke
 
-    result = _invoke_orchestrate(tmp_path, ref_file, runner, max_rounds=2)
+    result = _invoke_orchestrate(tmp_path, ref_file, runner, max_rounds=3)
     assert result is True
-    assert runner.counters["systems_review"] == 2
-    assert len(seen_plan_prompts) == 2
-    assert "persistent paged KV scheduler" in seen_plan_prompts[1]
-    assert "Latest scenario-aware systems review" in seen_plan_prompts[1]
+    assert runner.counters["systems_review"] == 1
+    assert len(seen_plan_prompts) == 3
+    assert "implement a persistent paged KV scheduler" in seen_plan_prompts[2]
+    assert "Latest scenario-aware systems review" in seen_plan_prompts[2]
 
 
 def test_loop_orchestrator_requests_profile_before_plan(tmp_path, ref_file):
