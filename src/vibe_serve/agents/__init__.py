@@ -9,11 +9,13 @@ runner classes are imported, so the public API of this package is::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .base import AgentRunner
-from .cli_runner import CliAgentRunner
-from .deepagents_runner import DeepAgentsRunner
+
+if TYPE_CHECKING:
+    from .cli_runner import CliAgentRunner
+    from .deepagents_runner import DeepAgentsRunner
 
 __all__ = ["AgentRunner", "DeepAgentsRunner", "CliAgentRunner", "build_agent_runner"]
 
@@ -72,6 +74,8 @@ def build_agent_runner(
     )
 
     if backend == "deepagents":
+        from .deepagents_runner import DeepAgentsRunner
+
         if backends is None:
             raise SystemExit(
                 "internal error: build_agent_runner called with backend='deepagents' "
@@ -109,6 +113,8 @@ def build_agent_runner(
         # cli_model overrides model.name for the CLI tool. If not set,
         # pass None so the CLI tool uses its own default.
         cli_model = (config.get("agent") or {}).get("cli_model")
+        from .cli_runner import CliAgentRunner
+
         return CliAgentRunner(
             provider=provider,
             model=cli_model,

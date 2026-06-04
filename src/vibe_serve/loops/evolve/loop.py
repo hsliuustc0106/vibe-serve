@@ -297,6 +297,9 @@ def run_evolve_loop(
     modality: str = "text_generation",
     objectives: list[Objective] | None = None,
     frontier_bias: float = 0.7,
+    live_monitor: bool = False,
+    live_monitor_port: int = 8765,
+    live_monitor_open: bool = False,
 ) -> bool:
     """Run an LLM-driven evolutionary search.
 
@@ -329,6 +332,9 @@ def run_evolve_loop(
         agent_backend=agent_backend,
         cli_provider=cli_provider,
         backend=backend,
+        live_monitor=live_monitor,
+        live_monitor_port=live_monitor_port,
+        live_monitor_open=live_monitor_open,
     )
     ctx.lprint(f"[log] evolutionary run: {ctx.run_log_path}")
     ctx.lprint(f"[log] experiment root: {ctx.exp_dir}")

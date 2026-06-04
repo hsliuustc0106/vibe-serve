@@ -159,7 +159,9 @@ Provider credentials live in `.env` — see `.env.example`. The CLI flags `--age
 
 ## Skills library
 
-`resources/skills/serving-systems/` contains the Agent Skills entries the inner loop's agents read at runtime: model architectures, serving algorithms, programming frameworks, backend libraries, hardware platforms, and reference engines. New optimization techniques and model families enter as new skill entries; the framework itself is target-agnostic.
+`resources/skills/serving-systems/` contains the Agent Skills entries the inner loop's agents read at runtime: model architectures, serving algorithms, programming frameworks, backend libraries, hardware platforms, and reference engines.
+
+`resources/skills/live-monitor/` is also loaded by default so a run can include the live progress monitor workflow and launch guidance without extra `--skills-dir` setup.
 
 ## Outputs
 
@@ -242,6 +244,7 @@ src/vibe_serve/
 
 examples/                         # six paper scenarios + nsys/torch profiler skills
 resources/skills/serving-systems/ # Agent Skills library
+resources/skills/live-monitor/    # Live monitor usage + startup workflow
 ```
 
 - **agent**: pre-round → profiler → orchestrator plan → implementer/judge

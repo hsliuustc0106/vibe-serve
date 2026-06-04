@@ -771,6 +771,9 @@ def run_agent_loop(
     cli_provider: str | None = None,
     backend: ComputeBackend = DEFAULT_COMPUTE_BACKEND,
     modality: str = "text_generation",
+    live_monitor: bool = False,
+    live_monitor_port: int = 8765,
+    live_monitor_open: bool = False,
 ) -> bool:
     """Run the orchestrator-driven build loop.
 
@@ -795,6 +798,9 @@ def run_agent_loop(
         agent_backend=agent_backend,
         cli_provider=cli_provider,
         backend=backend,
+        live_monitor=live_monitor,
+        live_monitor_port=live_monitor_port,
+        live_monitor_open=live_monitor_open,
     )
     ctx.lprint(f"[log] orchestrate run: {ctx.run_log_path}")
     ctx.lprint(f"[log] experiment root: {ctx.exp_dir}")
