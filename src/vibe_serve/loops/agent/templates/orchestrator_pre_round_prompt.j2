@@ -30,6 +30,18 @@ hard blocker; otherwise keep the benchmark gate alive.
 {{ exhaustion_info }}
 {% endif %}
 
+{% if systems_review %}
+## Latest systems review
+
+{{ systems_review }}
+
+Use this as a planning signal for whether profiling is useful. If the review
+already identifies an obvious missing serving-system primitive (for example
+continuous batching, paged KV/cache management, a production attention kernel,
+or CUDA graphs), skip profiling unless new measurements are needed to choose
+between two concrete implementations.
+{% endif %}
+
 ## Skills
 
 A library of curated technique-specific skills is installed in your working directory. Your CLI's native skill mechanism exposes their names + short descriptions; activate (open) only the ones whose description matches the active task. Don't preload them — let the agent harness page them in on demand.

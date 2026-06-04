@@ -120,19 +120,59 @@ Consider setting `revert_to_round` to an earlier round's commit if you believe t
 The implementer could not pass within the retry budget. Propose a strictly smaller, easier task that still moves forward. Do NOT re-propose the failed task verbatim.
 {% endif %}
 
+{% if systems_review %}
+## Latest scenario-aware systems review
+
+{{ systems_review }}
+
+Treat this as an independent architecture-review signal, not as optional
+commentary. Your plan should either follow the review's `Next-round priority`
+or explicitly explain why a harder correctness blocker must come first. In
+particular, do not spend early optimization rounds on narrow local fixes while
+the review shows that a scenario-critical primitive is missing:
+continuous batching for throughput, streaming for TTFT/TPOT validity, paged KV
+for higher concurrency / long context, production attention kernels for decode
+cost, or CUDA graphs for launch overhead.
+{% endif %}
+
 ## Optimization priority (read before choosing the next task)
 
-Serving systems have a well-established **optimization floor**: three techniques every production LLM server ships with, because each addresses a fundamental cost source the workload cannot avoid on NVIDIA hardware. Before proposing any workload-specific optimization (speculative decoding, prompt/prefix caching, grammar-constrained decoding fast paths, schema minimization, etc.), confirm all three are in place unless a specific one is **absolutely incompatible** with the objective:
+Serving systems have a well-established **optimization floor**: techniques every
+production LLM server ships with, because each addresses a fundamental cost
+source the workload cannot avoid on NVIDIA hardware. The priority order depends
+on the actual scenario:
+
+- **High-throughput / high-concurrency decode**: scheduling, continuous
+  batching, paged KV/cache management, batched attention, then CUDA graphs.
+- **Low-latency interactive serving**: streaming correctness first so TTFT/TPOT
+  are meaningful, then graph/launch overhead and attention kernels.
+- **Long-context prefill**: chunked prefill, KV block management, memory
+  pressure controls, and attention kernels matter before exotic decode tricks.
+- **Single-batch by contract**: continuous batching may be skipped, but only
+  when the goal contract or benchmark matrix proves the workload is truly
+  single-batch.
+
+Before proposing any workload-specific optimization (speculative decoding,
+prompt/prefix caching, grammar-constrained decoding fast paths, schema
+minimization, etc.), confirm the applicable floor items are in place unless a
+specific one is **absolutely incompatible** with the objective:
 
 1. **Continuous batching** (see `skills/serving-systems/algorithms/continuous-batching/`).
-2. **Attention kernel** — FlashInfer or FlashAttention (see `skills/serving-systems/backends/flashinfer/` and `skills/serving-systems/backends/flashattention/`).
-3. **CUDA graphs** (see `skills/serving-systems/backends/cuda-graph/`). 
+2. **Paged KV / block cache management** for concurrency and long context.
+3. **Attention kernel** — FlashInfer or FlashAttention (see `skills/serving-systems/backends/flashinfer/` and `skills/serving-systems/backends/flashattention/`).
+4. **CUDA graphs** (see `skills/serving-systems/backends/cuda-graph/`).
 
-**Only after these three are present and verified** (profiler-confirmed kernel count drops, FlashInfer calls visible, graph replay counters non-zero) should you spend rounds on workload-specific optimizations like speculative decoding, grammar-based fast paths, or prompt / prefix caching.
+**Only after the scenario-relevant floor is present and verified**
+(profiler-confirmed kernel count drops, FlashInfer calls visible, graph replay
+counters non-zero, scheduler/KV metrics exposed) should you spend rounds on
+workload-specific optimizations like speculative decoding, grammar-based fast
+paths, or prompt / prefix caching.
 
 The three exceptions that let you skip a floor item:
 
 - **Continuous batching**: skip when the benchmark / objective is single-batch by contract.
+- **Paged KV**: skip only when the benchmark has fixed tiny concurrency and no
+  long-context or memory-pressure path.
 - **Attention kernel**: skip when running on non-NVIDIA hardware where neither FlashInfer nor FlashAttention ships (Apple → MLX; AMD → the upstreamed FA AMD port).
 - **CUDA graphs**: skip when the decode shapes are genuinely unbucketable (very rare — even speculative-decoding tree depths and chunked-prefill chunk sizes are ≤ 16 buckets).
 

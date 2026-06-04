@@ -1,24 +1,24 @@
 """Tests for vibe_serve.loops.agent — orchestrator-driven build loop."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vibe_serve.agents import AgentRunner
-from vibe_serve.loops.agent.loop import run_agent_loop
-from vibe_serve.schemas import (
-    OrchestratorPlan,
-    PreRoundDecision,
-    ProfilerSummary,
-)
 from vibe_serve.loops.agent import issue_board
+from vibe_serve.loops.agent.loop import run_agent_loop
 from vibe_serve.schemas import (
     ImplementerResponse,
     JudgeResponse,
+    OrchestratorPlan,
+    PreRoundDecision,
+    ProfilerSummary,
+    SystemsBottleneck,
+    SystemsHotPathAudit,
+    SystemsReviewResponse,
+    SystemsScenario,
     Verdict,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures & helpers
@@ -47,6 +47,7 @@ def _make_orchestrate_runner(
     plans: list[OrchestratorPlan] | None = None,
     judge_verdicts: list[str] | None = None,
     profiler_responses: list[ProfilerSummary] | None = None,
+    systems_reviews: list[SystemsReviewResponse] | None = None,
 ):
     """Build a MagicMock AgentRunner whose invoke() returns scripted responses.
 
@@ -59,7 +60,15 @@ def _make_orchestrate_runner(
     plan_q = list(plans or [])
     judge_q = list(judge_verdicts or [])
     prof_q = list(profiler_responses or [])
-    counters = {"impl": 0, "judge": 0, "orch_pre": 0, "orch_plan": 0, "prof": 0}
+    review_q = list(systems_reviews or [])
+    counters = {
+        "impl": 0,
+        "judge": 0,
+        "orch_pre": 0,
+        "orch_plan": 0,
+        "prof": 0,
+        "systems_review": 0,
+    }
 
     runner = MagicMock(spec=AgentRunner)
     runner.backend_name = "deepagents"
@@ -101,6 +110,34 @@ def _make_orchestrate_runner(
                 analysis="ok",
                 bottlenecks="none",
                 suggestions="none",
+            )
+        if kind == "systems_reviewer":
+            counters["systems_review"] += 1
+            if review_q:
+                return review_q.pop(0)
+            return SystemsReviewResponse(
+                scenario=SystemsScenario(
+                    primary="high-throughput decode",
+                    evidence=["default harness review"],
+                ),
+                top_bottlenecks=[
+                    SystemsBottleneck(
+                        rank=1,
+                        issue="continuous batching missing",
+                        evidence=["default harness review"],
+                        expected_impact="improves aggregate throughput",
+                        recommended_task="add a request scheduler",
+                    )
+                ],
+                hot_path_audit=SystemsHotPathAudit(
+                    continuous_batching="missing",
+                    paged_kv="unknown",
+                    attention_backend="unknown",
+                    cuda_graphs="unknown",
+                    streaming_ttft_valid=True,
+                ),
+                next_round_priority="add continuous batching",
+                summary="default systems review",
             )
         raise AssertionError(f"unexpected kind: {kind}, response_cls={response_cls}")
 
@@ -161,6 +198,41 @@ def test_profiler_summary_perf_metric_optional():
     assert p2.perf_unit == "tok/s"
 
 
+def test_systems_review_response_accepts_scenario_and_bottlenecks():
+    review = SystemsReviewResponse(
+        scenario=SystemsScenario(
+            primary="high-throughput decode",
+            secondary=["long-context"],
+            evidence=["benchmark uses c32 in512 out128"],
+        ),
+        candidate_metric=20.0,
+        baseline_metric=280.0,
+        candidate_pct_of_baseline=7.14,
+        scenario_requirements=["scheduler", "paged KV"],
+        anti_goals=["single-request micro-optimizations before batching"],
+        top_bottlenecks=[
+            SystemsBottleneck(
+                rank=1,
+                issue="no scheduler",
+                evidence=["main.py handles one request at a time"],
+                expected_impact="required for concurrency throughput",
+                recommended_task="implement continuous batching",
+            )
+        ],
+        hot_path_audit=SystemsHotPathAudit(
+            continuous_batching="missing",
+            paged_kv="missing",
+            attention_backend="naive torch attention",
+            cuda_graphs="missing",
+            streaming_ttft_valid=True,
+        ),
+        next_round_priority="implement continuous batching",
+        summary="candidate is far below vLLM baseline",
+    )
+    assert review.scenario.primary == "high-throughput decode"
+    assert review.top_bottlenecks[0].recommended_task == "implement continuous batching"
+
+
 # ---------------------------------------------------------------------------
 # Progress helpers
 # ---------------------------------------------------------------------------
@@ -210,6 +282,32 @@ def test_progress_append_implementer_and_judge(tmp_path):
     assert "Round 3 — Implementer (attempt 1)" in text
     assert "Round 3 — Judge (attempt 1)" in text
     assert "verdict**: pass" in text
+
+
+def test_progress_writes_systems_review(tmp_path):
+    progress = tmp_path / "progress.md"
+    review = SystemsReviewResponse(
+        scenario=SystemsScenario(
+            primary="low-latency interactive",
+            evidence=["benchmark records TTFT and TPOT"],
+        ),
+        top_bottlenecks=[
+            SystemsBottleneck(
+                rank=1,
+                issue="streaming not implemented",
+                evidence=["responses are returned after full decode"],
+                expected_impact="TTFT is not meaningful without token streaming",
+                recommended_task="add SSE streaming",
+            )
+        ],
+        next_round_priority="add streaming SSE output",
+        summary="latency metrics need streaming",
+    )
+    issue_board.append_systems_review(progress, 4, review)
+    text = progress.read_text()
+    assert "Round 4 — Systems Reviewer" in text
+    assert "low-latency interactive" in text
+    assert "add streaming SSE output" in text
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +393,91 @@ def test_loop_exhaustion_carries_to_next_round(tmp_path, ref_file):
     # Round 2's plan prompt must contain the exhaustion signal.
     assert len(seen_plan_prompts) >= 2
     assert "exhausted" in seen_plan_prompts[1].lower()
+
+
+def test_loop_systems_review_carries_to_next_orchestrator_plan(tmp_path, ref_file):
+    seen_plan_prompts: list[str] = []
+    runner = _make_orchestrate_runner(
+        plans=[
+            OrchestratorPlan(
+                task="Build starter server",
+                pass_criteria="/health returns 200",
+                reasoning="cold start",
+            ),
+            OrchestratorPlan(
+                task="Enable baseline instrumentation",
+                pass_criteria="profiler summary includes metrics",
+                reasoning="second round captures perf signal before systems review",
+            ),
+            OrchestratorPlan(
+                task="Implement paged KV scheduler",
+                pass_criteria="benchmark improves tokens/sec",
+                reasoning="systems review identified scheduler gap",
+            ),
+        ],
+        pre_decisions=[
+            PreRoundDecision(
+                need_profile=True,
+                profile_focus="baseline throughput gate",
+                reasoning="collect first measurable signal",
+            )
+        ],
+        profiler_responses=[
+            ProfilerSummary(
+                analysis="good baseline",
+                bottlenecks="none",
+                suggestions="none",
+                perf_metric=20.0,
+                perf_unit="tok/s",
+            )
+        ],
+        systems_reviews=[
+            SystemsReviewResponse(
+                scenario=SystemsScenario(
+                    primary="high-throughput decode",
+                    evidence=["goal benchmark uses concurrency 32/64"],
+                ),
+                candidate_metric=20.0,
+                baseline_metric=280.0,
+                candidate_pct_of_baseline=7.14,
+                scenario_requirements=["continuous batching", "paged KV"],
+                top_bottlenecks=[
+                    SystemsBottleneck(
+                        rank=1,
+                        issue="paged KV scheduler missing",
+                        evidence=["no request queue or block table in main.py"],
+                        expected_impact="required for high concurrency throughput",
+                        recommended_task="implement a persistent paged KV scheduler",
+                    )
+                ],
+                hot_path_audit=SystemsHotPathAudit(
+                    continuous_batching="missing",
+                    paged_kv="missing",
+                    attention_backend="unknown",
+                    cuda_graphs="unknown",
+                    streaming_ttft_valid=True,
+                ),
+                next_round_priority="implement a persistent paged KV scheduler",
+                summary="candidate is far below vLLM under concurrency",
+            )
+        ],
+    )
+
+    real_invoke = runner.invoke.side_effect
+
+    def spy_invoke(*, kind, response_cls, **kwargs):
+        if kind == "orchestrator" and response_cls is OrchestratorPlan:
+            seen_plan_prompts.append(kwargs.get("system_prompt", ""))
+        return real_invoke(kind=kind, response_cls=response_cls, **kwargs)
+
+    runner.invoke.side_effect = spy_invoke
+
+    result = _invoke_orchestrate(tmp_path, ref_file, runner, max_rounds=3)
+    assert result is True
+    assert runner.counters["systems_review"] == 1
+    assert len(seen_plan_prompts) == 3
+    assert "implement a persistent paged KV scheduler" in seen_plan_prompts[2]
+    assert "Latest scenario-aware systems review" in seen_plan_prompts[2]
 
 
 def test_loop_orchestrator_requests_profile_before_plan(tmp_path, ref_file):

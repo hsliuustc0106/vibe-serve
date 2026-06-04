@@ -381,6 +381,10 @@ class _RunContext:
                 # and writes plans — reuse the implementer's backend for
                 # file access.
                 "orchestrator": self.implementer_backend,
+                # Systems reviewer inspects the same workspace and benchmark
+                # artifacts, then feeds scenario-aware guidance to the next
+                # orchestrator plan.
+                "systems_reviewer": self.implementer_backend,
             },
             skills=self.skills_for_agents,
             skill_source_dirs=self._skill_source_paths,

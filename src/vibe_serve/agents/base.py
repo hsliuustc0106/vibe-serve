@@ -18,12 +18,14 @@ struct or would lie about reuse semantics on one of the backends.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from langchain_core.tools import BaseTool
-from vibe_serve._agent_cli.base import MCPServerSpec
 from pydantic import BaseModel
+
+from vibe_serve._agent_cli.base import MCPServerSpec
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -53,7 +55,9 @@ class AgentRunner(Protocol):
         """Run an agent and return a structured response.
 
         Args:
-            kind: One of ``"implementer"``, ``"judge"``, ``"perf_eval"``.
+            kind: Agent role label, such as ``"implementer"``, ``"judge"``,
+                ``"perf_eval"``, ``"orchestrator"``, or
+                ``"systems_reviewer"``.
                 The deepagents runner uses this to pick the right
                 ``BaseSandbox`` from its backends dict; both backends use
                 it to derive the human-facing label.

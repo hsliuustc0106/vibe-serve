@@ -9,35 +9,33 @@ collect kernel-level data first.
 from __future__ import annotations
 
 import json
-import os
 import re
-import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from vibe_serve.constants import ComputeBackend, DEFAULT_COMPUTE_BACKEND
+from vibe_serve.constants import DEFAULT_COMPUTE_BACKEND, ComputeBackend
 from vibe_serve.context import _RunContext
-from vibe_serve.loops.agent.goal_contract import load_goal_contract_text
 from vibe_serve.loops.agent import issue_board
+from vibe_serve.loops.agent.goal_contract import load_goal_contract_text
 from vibe_serve.loops.agent.round_summary import summarize_rounds
-from vibe_serve.schemas import (
-    OrchestratorPlan,
-    PreRoundDecision,
-    ProfilerSummary,
-)
 from vibe_serve.loops.profiler import invoke_profiler
 from vibe_serve.prompts import render_template
-from vibe_serve.schemas import (
-    ImplementerResponse,
-    JudgeResponse,
-    Verdict,
-)
 from vibe_serve.sandbox.run_environment import (
     RunEnvironmentSpec,
     make_run_environment_spec,
 )
-
+from vibe_serve.schemas import (
+    ImplementerResponse,
+    JudgeResponse,
+    OrchestratorPlan,
+    PreRoundDecision,
+    ProfilerSummary,
+    SystemsBottleneck,
+    SystemsReviewResponse,
+    SystemsScenario,
+    Verdict,
+)
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -82,7 +80,7 @@ class _RoundRecord:
         }
 
     @classmethod
-    def from_json(cls, data: dict) -> "_RoundRecord":
+    def from_json(cls, data: dict) -> _RoundRecord:
         return cls(
             round_number=int(data["round"]),
             commit=data.get("commit"),
@@ -144,6 +142,11 @@ def _record_round_number(record: _RoundRecord | dict[str, Any]) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _has_measured_round(records: list[_RoundRecord]) -> bool:
+    """Whether any recorded round has a usable headline metric."""
+    return any(_record_metric(r) is not None for r in records)
 
 
 def _numeric_from_text(text: str, metric_name: str | None) -> float | None:
@@ -460,6 +463,7 @@ def _git_checkout(ctx: _RunContext, sha: str) -> bool:
 class _CarryOver:
     regression_info: str | None = None
     exhaustion_info: str | None = None
+    systems_review_info: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +491,7 @@ def _run_pre_round_decision(
         objective=objective,
         regression_info=carry.regression_info,
         exhaustion_info=carry.exhaustion_info,
+        systems_review=carry.systems_review_info,
         benchmark_context=benchmark_context,
     )
     decision = ctx.invoke(
@@ -563,6 +568,7 @@ def _run_orchestrator_plan(
         profiler_summary=profiler_summary,
         regression_info=carry.regression_info,
         exhaustion_info=carry.exhaustion_info,
+        systems_review=carry.systems_review_info,
         roadmap_text=roadmap_text,
         plateau_warning=plateau_warning,
         runtime_notes=ctx.run_environment_view.prompt_notes,
@@ -584,6 +590,70 @@ def _run_orchestrator_plan(
     )
     issue_board.append_orchestrator_plan(progress_path, round_number, plan)
     return plan
+
+
+def _run_systems_reviewer(
+    ctx: _RunContext,
+    *,
+    round_number: int,
+    objective: str,
+    progress_path: Path,
+    roadmap_text: str,
+    goal_contract: str | None,
+    benchmark_context: str,
+    round_summary: str,
+) -> SystemsReviewResponse:
+    system_prompt = render_template(
+        "systems_reviewer_prompt.j2",
+        template_dir=_TEMPLATE_DIR,
+        objective=objective,
+        runtime_notes=ctx.run_environment_view.prompt_notes,
+        env_kind=ctx.run_environment_view.env_kind,
+        goal_contract=goal_contract,
+        benchmark_context=benchmark_context,
+        roadmap_text=roadmap_text,
+        round_summary=round_summary,
+        round_number=round_number,
+    )
+    response = ctx.invoke(
+        kind="systems_reviewer",
+        system_prompt=system_prompt,
+        user_prompt=(
+            "Audit the current serving engine and benchmark gap. Return only "
+            "the JSON object."
+        ),
+        response_cls=SystemsReviewResponse,
+        fallback_factory=lambda: SystemsReviewResponse(
+            scenario=SystemsScenario(
+                primary="unknown",
+                evidence=["fallback: no structured systems review received"],
+            ),
+            top_bottlenecks=[
+                SystemsBottleneck(
+                    rank=1,
+                    issue="No structured systems review was produced.",
+                    evidence=["agent fallback"],
+                    expected_impact=(
+                        "The orchestrator lacks scenario-aware bottleneck "
+                        "guidance for the next round."
+                    ),
+                    recommended_task=(
+                        "Inspect goal.json, progress.md, benchmark output, "
+                        "and main.py before choosing the next optimization."
+                    ),
+                )
+            ],
+            next_round_priority=(
+                "Rebuild scenario-aware evidence before selecting the next "
+                "serving optimization."
+            ),
+            summary="Systems reviewer produced no structured response.",
+        ),
+        round_label=f"round-{round_number}-systems-reviewer",
+    )
+    issue_board.append_systems_review(progress_path, round_number, response)
+    ctx.snapshot_workspace(f"round-{round_number}-systems-reviewer")
+    return response
 
 
 def _run_implementer(
@@ -910,7 +980,10 @@ def run_agent_loop(
 
             if not passed:
                 issue_board.append_exhaustion_note(
-                    progress_path, round_number, max_retries_per_round, feedback or "",
+                    progress_path,
+                    round_number,
+                    max_retries_per_round,
+                    feedback or "",
                 )
                 carry.exhaustion_info = (
                     f"Round {round_number} did not pass after "
@@ -940,6 +1013,29 @@ def run_agent_loop(
                             f"{(' ' + (best_metric_name or '')) if best_metric_name else ''} "
                             f"at round {best_round_no}."
                         )
+
+            if (
+                round_number < max_rounds
+                and not _is_fresh_cold_start(round_number, records)
+                and _has_measured_round(records)
+            ):
+                round_summary_text = json.dumps(
+                    summarize_rounds(records, goal_contract_data),
+                    indent=2,
+                )
+                systems_review = _run_systems_reviewer(
+                    ctx,
+                    round_number=round_number,
+                    objective=objective,
+                    progress_path=progress_path,
+                    roadmap_text=issue_board.read_roadmap(roadmap_path),
+                    goal_contract=goal_contract,
+                    benchmark_context=_benchmark_context(records, goal_contract_data),
+                    round_summary=round_summary_text,
+                )
+                carry.systems_review_info = issue_board.format_systems_review(
+                    systems_review
+                )
 
             round_number += 1
 
