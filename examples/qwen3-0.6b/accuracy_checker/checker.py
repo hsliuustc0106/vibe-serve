@@ -35,8 +35,8 @@ def _get_health(url: str) -> None:
 
 def _validate_completion(resp: dict[str, Any]) -> None:
     choices = resp.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise ValueError("missing choices in completion response")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        raise ValueError("missing or invalid choices in completion response")
     if "text" not in choices[0]:
         raise ValueError("completion.choice does not contain text")
 
@@ -56,7 +56,8 @@ def main() -> None:
         raise SystemExit(f"health check failed: {exc}") from exc
 
     failures = 0
-    for _ in range(max(args.num_samples, 1)):
+    actual_samples = max(args.num_samples, 1)
+    for _ in range(actual_samples):
         try:
             response = _post_json(
                 f"{args.url.rstrip('/')}/v1/completions",
@@ -75,9 +76,9 @@ def main() -> None:
 
     latency_ms = (time.perf_counter() - t0) * 1000.0
     result = {
-        "num_samples": args.num_samples,
+        "num_samples": actual_samples,
         "failed": failures,
-        "passed": args.num_samples - failures,
+        "passed": actual_samples - failures,
         "latency_ms": latency_ms,
     }
 
@@ -90,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -10,7 +10,6 @@ from pathlib import Path
 
 import httpx
 
-
 PROMPTS = [
     "The capital of France is",
     "Once upon a time in a land far away,",
@@ -37,7 +36,12 @@ async def send_request(client: httpx.AsyncClient, url: str, prompt: str, max_tok
                 t_done = time.perf_counter()
                 break
             chunk = json.loads(payload)
-            delta = chunk["choices"][0].get("text", "")
+            choices = chunk.get("choices", [])
+            delta = (
+                choices[0].get("text", "")
+                if isinstance(choices, list) and choices and isinstance(choices[0], dict)
+                else ""
+            )
             if first_line and delta:
                 t_first = time.perf_counter()
                 first_line = False

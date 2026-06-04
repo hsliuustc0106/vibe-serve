@@ -38,7 +38,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-read -r -a EXTRA_SERVER_ARGS <<< "${VLLM_SERVER_ARGS:-}"
+EXTRA_SERVER_ARGS=()
+if [[ -n "${VLLM_SERVER_ARGS:-}" ]]; then
+  read -r -a EXTRA_SERVER_ARGS <<< "$VLLM_SERVER_ARGS"
+fi
 
 "$VLLM_UV_ENV/bin/vllm" serve "$VLLM_MODEL" \
   --served-model-name "$VLLM_SERVED_MODEL_NAME" \

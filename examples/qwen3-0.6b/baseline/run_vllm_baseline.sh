@@ -62,7 +62,10 @@ if [[ -z "${CUDA_VISIBLE_DEVICES:-}" && -n "${VLLM_VISIBLE_DEVICES:-}" ]]; then
   export CUDA_VISIBLE_DEVICES="$VLLM_VISIBLE_DEVICES"
 fi
 
-read -r -a EXTRA_SERVER_ARGS <<< "${VLLM_SERVER_ARGS:-}"
+EXTRA_SERVER_ARGS=()
+if [[ -n "${VLLM_SERVER_ARGS:-}" ]]; then
+  read -r -a EXTRA_SERVER_ARGS <<< "$VLLM_SERVER_ARGS"
+fi
 "$VLLM_UV_ENV/bin/vllm" serve "$VLLM_MODEL" \
   --served-model-name "$VLLM_SERVED_MODEL_NAME" \
   --host "$VLLM_HOST" \

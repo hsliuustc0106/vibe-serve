@@ -571,7 +571,14 @@ class _RunContext:
             return
         runner_src = PROJECT_ROOT / "resources" / "starters" / "fastapi-transformers" / "run_benchmark.sh"
         if runner_src.is_file():
-            shutil.copy2(runner_src, dst)
+            try:
+                if dst.exists():
+                    dst.unlink()
+                shutil.copy2(runner_src, dst)
+            except PermissionError:
+                self.lprint(
+                    f"[warn] _copy_benchmark_runner: could not copy run_benchmark.sh to {dst}"
+                )
 
     def wait_for_debug(self, step: str) -> None:
         if self.debug:
