@@ -118,7 +118,7 @@ contracts such as required endpoints, device limits, benchmark matrices,
 baseline metrics, staged validation order, and forbidden shortcuts.
 
 See `examples/Llama-3-8B/`, `examples/moonshine-streaming/`,
-`examples/qwen3-32b-code-edit/`, `examples/olmo-hybrid-prefix-caching/`,
+`examples/qwen3-0.6b/`, `examples/qwen3-32b-code-edit/`, `examples/olmo-hybrid-prefix-caching/`,
 `examples/Llama-3.1-8B-Instruct-MLX-8bit/`,
 `examples/show-o2-1.5B-HQ-h100/`, and
 `examples/show-o2-1.5B-HQ-macbook/` for concrete targets.
