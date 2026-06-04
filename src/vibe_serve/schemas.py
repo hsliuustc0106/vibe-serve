@@ -14,6 +14,9 @@ output lives here, organized by purpose:
   - Profiler:             ProfilerResponse, ProfilerSummary
   - Orchestrator (agent loop):
                           PreRoundDecision, OrchestratorPlan
+  - Systems reviewer (agent loop):
+                          SystemsScenario, SystemsHotPathAudit,
+                          SystemsBottleneck, SystemsReviewResponse
   - Mutator (evolve loop):
                           MutatorResponse
 
@@ -21,22 +24,21 @@ This module has no local imports, so templates and tests can pull
 schemas in without dragging in the rest of the agent runtime.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-
 
 # ===========================================================================
 # Enums
 # ===========================================================================
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     PASS = "pass"
     FAIL = "fail"
 
 
-class PerfTrend(str, Enum):
+class PerfTrend(StrEnum):
     IMPROVED = "improved"
     REGRESSED = "regressed"
     MIXED = "mixed"
@@ -250,6 +252,109 @@ class OrchestratorPlan(BaseModel):
     reasoning: str = Field(
         description="Short explanation of the orchestrator's reasoning for this round."
     )
+
+
+class SystemsScenario(BaseModel):
+    """Workload scenario classification from the systems reviewer."""
+
+    primary: str = Field(
+        description=(
+            "Primary serving scenario, e.g. low-latency interactive, "
+            "high-throughput offline, long-context prefill, or mixed."
+        )
+    )
+    secondary: list[str] = Field(
+        default_factory=list,
+        description="Secondary scenario pressures that still affect planning.",
+    )
+    evidence: list[str] = Field(
+        default_factory=list,
+        description="Concrete benchmark, goal-contract, or code evidence for the scenario.",
+    )
+
+
+class SystemsHotPathAudit(BaseModel):
+    """Reviewer audit of the core serving-system mechanisms."""
+
+    continuous_batching: str = Field(
+        default="unknown",
+        description="Status and evidence for continuous batching / scheduling.",
+    )
+    paged_kv: str = Field(
+        default="unknown",
+        description="Status and evidence for paged or block-managed KV cache.",
+    )
+    attention_backend: str = Field(
+        default="unknown",
+        description="Status and evidence for FlashInfer / FlashAttention / equivalent kernels.",
+    )
+    cuda_graphs: str = Field(
+        default="unknown",
+        description="Status and evidence for CUDA graph capture/replay.",
+    )
+    streaming_ttft_valid: bool | None = Field(
+        default=None,
+        description="Whether the current server streams tokens so TTFT/TPOT are meaningful.",
+    )
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Additional hot-path observations that do not fit a named field.",
+    )
+
+
+class SystemsBottleneck(BaseModel):
+    """Ranked missing capability or bottleneck with evidence and next action."""
+
+    rank: int = Field(description="1-based priority rank; 1 is most important.")
+    issue: str = Field(description="Concise bottleneck or missing capability.")
+    evidence: list[str] = Field(
+        default_factory=list,
+        description="Concrete code, benchmark, profiler, or log evidence.",
+    )
+    expected_impact: str = Field(
+        description="Why fixing this should matter for the classified scenario."
+    )
+    recommended_task: str = Field(
+        description="Specific implementer-sized task the orchestrator should consider."
+    )
+
+
+class SystemsReviewResponse(BaseModel):
+    """Structured response from the scenario-aware systems reviewer."""
+
+    scenario: SystemsScenario = Field(description="Scenario classification.")
+    candidate_metric: float | None = Field(
+        default=None,
+        description="Latest candidate headline metric, if observed.",
+    )
+    baseline_metric: float | None = Field(
+        default=None,
+        description="vLLM or reference baseline headline metric, if observed.",
+    )
+    candidate_pct_of_baseline: float | None = Field(
+        default=None,
+        description="Candidate metric as percent of baseline, if computable.",
+    )
+    scenario_requirements: list[str] = Field(
+        default_factory=list,
+        description="Requirements implied by the scenario, ordered by importance.",
+    )
+    anti_goals: list[str] = Field(
+        default_factory=list,
+        description="Optimizations or metrics that should not dominate this scenario.",
+    )
+    top_bottlenecks: list[SystemsBottleneck] = Field(
+        default_factory=list,
+        description="Ranked missing systems capabilities or hot-path bottlenecks.",
+    )
+    hot_path_audit: SystemsHotPathAudit = Field(
+        default_factory=SystemsHotPathAudit,
+        description="Audit of core serving mechanisms.",
+    )
+    next_round_priority: str = Field(
+        description="Single highest-priority recommendation for the next orchestrator plan."
+    )
+    summary: str = Field(description="Short human-readable status summary.")
 
 
 # ===========================================================================

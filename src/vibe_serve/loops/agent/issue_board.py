@@ -19,15 +19,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from vibe_serve.schemas import (
+    ImplementerResponse,
+    JudgeResponse,
     OrchestratorPlan,
     PreRoundDecision,
     ProfilerSummary,
+    SystemsReviewResponse,
 )
-from vibe_serve.schemas import (
-    ImplementerResponse,
-    JudgeResponse,
-)
-
 
 # ---------------------------------------------------------------------------
 # roadmap.md — orchestrator's strategic memory
@@ -173,6 +171,78 @@ def _append(progress_path: Path, block: str) -> None:
         fh.write(block + "\n")
 
 
+def _bullet_list(items: list[str]) -> str:
+    if not items:
+        return "- (none recorded)"
+    return "\n".join(f"- {item}" for item in items)
+
+
+def format_systems_review(response: SystemsReviewResponse) -> str:
+    """Render a compact, prompt-friendly systems review summary."""
+    scenario_lines = [
+        f"- **primary**: {response.scenario.primary}",
+        f"- **secondary**: {', '.join(response.scenario.secondary) or '(none)'}",
+    ]
+    if response.scenario.evidence:
+        scenario_lines.append("### Scenario evidence")
+        scenario_lines.append(_bullet_list(response.scenario.evidence))
+
+    gap_parts = []
+    if response.candidate_metric is not None:
+        gap_parts.append(f"candidate={response.candidate_metric:g}")
+    if response.baseline_metric is not None:
+        gap_parts.append(f"baseline={response.baseline_metric:g}")
+    if response.candidate_pct_of_baseline is not None:
+        gap_parts.append(
+            f"candidate_pct_of_baseline={response.candidate_pct_of_baseline:g}%"
+        )
+    gap_text = ", ".join(gap_parts) if gap_parts else "unknown"
+
+    bottlenecks = []
+    for bottleneck in sorted(response.top_bottlenecks, key=lambda item: item.rank):
+        evidence = (
+            f" Evidence: {'; '.join(bottleneck.evidence)}"
+            if bottleneck.evidence
+            else ""
+        )
+        bottlenecks.append(
+            f"{bottleneck.rank}. {bottleneck.issue} — "
+            f"{bottleneck.expected_impact}. "
+            f"Recommended task: {bottleneck.recommended_task}.{evidence}"
+        )
+    bottleneck_text = "\n".join(bottlenecks) if bottlenecks else "(none recorded)"
+
+    audit = response.hot_path_audit
+    audit_lines = [
+        f"- **continuous_batching**: {audit.continuous_batching}",
+        f"- **paged_kv**: {audit.paged_kv}",
+        f"- **attention_backend**: {audit.attention_backend}",
+        f"- **cuda_graphs**: {audit.cuda_graphs}",
+        f"- **streaming_ttft_valid**: {audit.streaming_ttft_valid}",
+    ]
+    if audit.notes:
+        audit_lines.append("### Hot-path notes")
+        audit_lines.append(_bullet_list(audit.notes))
+
+    scenario_text = "\n".join(scenario_lines)
+    audit_text = "\n".join(audit_lines)
+    return (
+        "### Scenario\n"
+        f"{scenario_text}\n\n"
+        f"### Baseline gap\n- **headline**: {gap_text}\n\n"
+        "### Scenario requirements\n"
+        f"{_bullet_list(response.scenario_requirements)}\n\n"
+        "### Anti-goals\n"
+        f"{_bullet_list(response.anti_goals)}\n\n"
+        "### Hot-path audit\n"
+        f"{audit_text}\n\n"
+        "### Top bottlenecks\n"
+        f"{bottleneck_text}\n\n"
+        f"### Next-round priority\n{response.next_round_priority}\n\n"
+        f"### Summary\n{response.summary}"
+    )
+
+
 def append_pre_round_decision(
     progress_path: Path, round_number: int, decision: PreRoundDecision
 ) -> None:
@@ -237,6 +307,16 @@ def append_judge(
         f"- **verdict**: {response.verdict.value}\n\n"
         f"### Analysis\n{response.analysis}\n\n"
         f"### Feedback\n{response.feedback}\n"
+    )
+    _append(progress_path, block)
+
+
+def append_systems_review(
+    progress_path: Path, round_number: int, response: SystemsReviewResponse
+) -> None:
+    block = (
+        f"## Round {round_number} — Systems Reviewer\n"
+        f"{format_systems_review(response)}\n"
     )
     _append(progress_path, block)
 
