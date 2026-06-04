@@ -37,10 +37,14 @@ This collection assumes existing kernel libraries. Writing new CUDA / Triton / C
 
 ## Setup
 
-The vibeserve agent CLIs auto-load this skill from `skills/serving-systems/`
-via the `--skills-dir` flag (default in `vibe_serve/cli_common.py`),
-copying the skill tree into each workspace's `.claude/skills/` so the
-in-workspace coding agent picks it up.
+The vibeserve agent CLIs auto-load:
+
+- `skills/serving-systems/` (serving knowledge),
+- `skills/live-monitor/` (runtime monitor workflow and launch command),
+
+via the `--skills-dir` flag (defaults now include both in
+`vibe_serve/cli.py`), copying each skill tree into every workspace's
+`.claude/skills/` so the in-workspace coding agent can pick it up.
 
 The reference engines (`repos/{vllm,sglang,TensorRT-LLM}/`) are tracked as
 git submodules — initialize with:

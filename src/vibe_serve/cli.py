@@ -166,14 +166,18 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--skills-dir",
-        default=[Path("resources/skills/serving-systems")],
+        default=[
+            Path("resources/skills/serving-systems"),
+            Path("resources/skills/live-monitor"),
+        ],
         action="append",
         type=Path,
         help=(
             "Path to a skill source (can be repeated). Each entry can be "
             "either a single skill directory (containing a top-level "
             "`SKILL.md`) or a parent directory of multiple skill directories. "
-            "Default: `resources/skills/serving-systems/`."
+            "Default: `resources/skills/serving-systems/`, "
+            "`resources/skills/live-monitor/`."
         ),
     )
     parser.add_argument(
@@ -233,6 +237,22 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         "--git-tracking",
         action="store_true",
         help="Track workspace versions via git commits instead of directory snapshots.",
+    )
+    parser.add_argument(
+        "--live-monitor",
+        action="store_true",
+        help="Start the live HTML progress monitor for this run.",
+    )
+    parser.add_argument(
+        "--live-monitor-port",
+        type=int,
+        default=8765,
+        help="Port for --live-monitor (default: 8765).",
+    )
+    parser.add_argument(
+        "--live-monitor-open",
+        action="store_true",
+        help="Open the monitor URL in your default browser when it starts.",
     )
     parser.add_argument(
         "--agent-backend",
@@ -455,6 +475,9 @@ def _run_agent(args: argparse.Namespace) -> None:
         cli_provider=args.cli_provider,
         backend=backend,
         modality=args.modality,
+        live_monitor=args.live_monitor,
+        live_monitor_port=args.live_monitor_port,
+        live_monitor_open=args.live_monitor_open,
     )
 
     if success:
@@ -602,6 +625,9 @@ def _run_evolve(args: argparse.Namespace) -> None:
         agent_backend=args.agent_backend,
         cli_provider=args.cli_provider,
         backend=backend,
+        live_monitor=args.live_monitor,
+        live_monitor_port=args.live_monitor_port,
+        live_monitor_open=args.live_monitor_open,
         modality=args.modality,
         objectives=objectives,
         frontier_bias=args.frontier_bias,
@@ -705,6 +731,9 @@ def _run_plain(args: argparse.Namespace) -> None:
         agent_backend=args.agent_backend,
         cli_provider=args.cli_provider,
         backend=backend,
+        live_monitor=args.live_monitor,
+        live_monitor_port=args.live_monitor_port,
+        live_monitor_open=args.live_monitor_open,
     )
 
     if success:

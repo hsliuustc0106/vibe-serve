@@ -2,6 +2,7 @@
 
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -135,6 +136,9 @@ class _RunContext:
         agent_backend: str | None = None,
         cli_provider: str | None = None,
         backend: ComputeBackend = DEFAULT_COMPUTE_BACKEND,
+        live_monitor: bool = False,
+        live_monitor_port: int = 8765,
+        live_monitor_open: bool = False,
     ):
         self.backend: ComputeBackend = backend
         run_environment = run_environment or make_run_environment_spec()
@@ -144,6 +148,8 @@ class _RunContext:
 
         self.log_dir = self.exp_dir / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.report_dir = self.exp_dir / "reports"
+        self.report_dir.mkdir(parents=True, exist_ok=True)
         run_started = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.run_log_path = self.log_dir / f"run-{run_started}.log"
         self.run_log_file = self.run_log_path.open("a", encoding="utf-8")
@@ -167,6 +173,10 @@ class _RunContext:
         }
         self.debug = debug
         self.git_tracking = git_tracking
+        self.live_monitor = live_monitor
+        self.live_monitor_port = live_monitor_port
+        self.live_monitor_open = live_monitor_open
+        self._live_monitor_process = None
 
         # Construct the platform backend (image + GPU spec come from it).
         self.backend_impl = backends.get(
@@ -398,6 +408,74 @@ class _RunContext:
             use_modal=self.run_environment_view.cli_modal_sandboxed,
             log_dir=self.log_dir,
         )
+        self._start_live_monitor()
+
+    def _start_live_monitor(self) -> None:
+        if not self.live_monitor:
+            return
+        script = PROJECT_ROOT / "scripts" / "monitor_run_progress.sh"
+        if not script.is_file():
+            self.lprint("[monitor] script not found: scripts/monitor_run_progress.sh")
+            return
+        try:
+            self._live_monitor_process = subprocess.Popen(
+                [
+                    str(script),
+                    "--run-dir",
+                    str(self.exp_dir),
+                    "--port",
+                    str(self.live_monitor_port),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception as exc:
+            self._live_monitor_process = None
+            self.lprint(f"[monitor] failed to start: {exc}")
+            return
+
+        # If startup failed immediately (usually due to port binding issues),
+        # keep going without interrupting the run.
+        if self._live_monitor_process.poll() is not None:
+            self.lprint("[monitor] process exited immediately after launch.")
+            self._live_monitor_process = None
+            return
+
+        self._live_monitor_url = (
+            f"http://127.0.0.1:{self.live_monitor_port}/live_progress.html"
+        )
+        self.lprint(f"[monitor] live progress URL: {self._live_monitor_url}")
+        if self.live_monitor_open:
+            try:
+                import webbrowser
+
+                webbrowser.open(self._live_monitor_url)
+            except Exception:
+                self.lprint("[monitor] unable to open browser for live monitor")
+
+    def _stop_live_monitor(self) -> None:
+        if self._live_monitor_process is None:
+            return
+        if self._live_monitor_process.poll() is not None:
+            return
+        try:
+            try:
+                os.killpg(os.getpgid(self._live_monitor_process.pid), signal.SIGTERM)
+            except ProcessLookupError:
+                self._live_monitor_process.terminate()
+            except OSError:
+                self._live_monitor_process.terminate()
+            self._live_monitor_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(self._live_monitor_process.pid), signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                self._live_monitor_process.kill()
+            try:
+                self._live_monitor_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
 
     def gpu_env(self) -> dict[str, str]:
         """Env vars to inject into the host-running cli agent runner.
@@ -770,6 +848,7 @@ class _RunContext:
         if self._closed:
             return
         self._closed = True
+        self._stop_live_monitor()
         if self.gpu_monitor is not None:
             self.gpu_monitor.stop()
         self._finalize_gpu_metadata()

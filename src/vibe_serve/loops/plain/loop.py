@@ -353,6 +353,9 @@ def run_plain_loop(
     agent_backend: str | None = None,
     cli_provider: str | None = None,
     backend: ComputeBackend = DEFAULT_COMPUTE_BACKEND,
+    live_monitor: bool = False,
+    live_monitor_port: int = 8765,
+    live_monitor_open: bool = False,
 ) -> bool:
     """Run the issue-tracker driven loop.
 
@@ -381,6 +384,9 @@ def run_plain_loop(
         agent_backend=agent_backend,
         cli_provider=cli_provider,
         backend=backend,
+        live_monitor=live_monitor,
+        live_monitor_port=live_monitor_port,
+        live_monitor_open=live_monitor_open,
     ) as ctx:
         ctx.lprint(f"[log] experiment log: {ctx.run_log_path}")
         ctx.lprint(f"[log] experiment root: {ctx.exp_dir}")

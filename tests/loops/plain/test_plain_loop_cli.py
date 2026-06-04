@@ -58,6 +58,9 @@ class TestBuildParser:
         assert hasattr(args, "ref")
         assert hasattr(args, "docker")
         assert hasattr(args, "debug")
+        assert args.live_monitor is False
+        assert args.live_monitor_port == 8765
+        assert args.live_monitor_open is False
 
 
 class TestMain:
@@ -109,6 +112,23 @@ class TestMain:
                 assert kwargs["max_rounds"] == 7
                 assert kwargs["max_attempts_per_issue"] == 4
                 assert kwargs["max_issues_per_perf_eval"] == 2
+
+    def test_main_passes_live_monitor_args_to_run_loop(self):
+        with patch("sys.argv", [
+            *self._BASE_ARGV,
+            "--live-monitor",
+            "--live-monitor-open",
+            "--live-monitor-port", "61234",
+        ]):
+            with self._patch_config(), patch(
+                "vibe_serve.loops.plain.loop.run_plain_loop",
+                return_value=True,
+            ) as mock_run:
+                main()
+                kwargs = mock_run.call_args.kwargs
+                assert kwargs["live_monitor"] is True
+                assert kwargs["live_monitor_open"] is True
+                assert kwargs["live_monitor_port"] == 61234
 
     def test_main_start_round_overrides_loaded_state(self, tmp_path):
         with patch("sys.argv", [
