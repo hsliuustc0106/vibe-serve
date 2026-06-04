@@ -42,14 +42,26 @@ Run validation in this order. Stop at the first hard failure and return
 minutes on later benchmark stages when an earlier correctness gate already
 proved the candidate cannot pass.
 
-- **Unit tests** — run `uv run pytest -v`. All tests must pass.
+- **Unit tests** — run `uv run pytest -v`. All collected tests must pass. If
+   pytest exits only because no tests were collected (exit code 5), treat that
+   as "no unit-test signal" and continue to the server/checker gates rather
+   than failing the round solely for an empty smoke workspace.
 - **Server startup** — start the server using the implementation's documented
-   entrypoint, write logs to `/tmp/server.log`, and wait for the process to stay
-   alive long enough to answer requests. If startup fails, read `/tmp/server.log`,
-   fail immediately, and do not run checker or benchmark.
+   entrypoint. Write logs to a per-round file such as
+   `/tmp/vibeserve-round-{{ round_number }}-retry-{{ retry }}-server.log` instead of reusing stale
+   `/tmp/server.log`, record the launch command and PID in your analysis, and
+   wait for the process to stay alive long enough to answer requests. Use a
+   readiness loop with a realistic timeout (for example 60-120 seconds for local
+   model loading) before declaring startup failed. If startup fails, read the
+   per-round log file and process status, fail immediately, and do not run
+   checker or benchmark.
+   Prefer a launch shape like:
+   `LOG=/tmp/vibeserve-round-{{ round_number }}-retry-{{ retry }}-server.log; : > "$LOG"; <entrypoint> > "$LOG" 2>&1 & SERVER_PID=$!`.
+   Never use a log file from a prior round as evidence for the current round.
 - **Health check** — probe `/health` until it returns 200 or a short timeout
    expires. If `/health` never returns 200, fail immediately with the relevant
-   `/tmp/server.log` excerpt.
+   per-round log excerpt and whether the process is still alive, exited, or
+   bound to a different host/port.
 - **Single-request smoke** — send one minimal request for the endpoint scoped
    by this round's pass criteria (or the endpoint required by `goal.json`, if
    present). Confirm the response is transport-valid and non-empty for generation
@@ -68,6 +80,12 @@ Additionally, for every issue the checker flagged as "sentinel-missing", treat i
    or benchmark matrix required by the objective / `goal.json` only after all
    earlier gates have passed. If an early gate failed, return that failure
    instead of spending time collecting low-value all-zero benchmark metrics.
+- **Benchmark metric reporting** — when a benchmark or benchmark matrix runs,
+   include the measured headline metric in `analysis` using this exact
+   parse-friendly form: `<primary_metric> = <number>`. If the benchmark reports
+   success rate, also include `success_rate = <number>`. Do this even when the
+   round fails the performance threshold, so the framework can persist the
+   observed value separately from the judge verdict.
 - **Cleanup** — kill the server before returning your verdict, regardless of
    pass or fail.
 

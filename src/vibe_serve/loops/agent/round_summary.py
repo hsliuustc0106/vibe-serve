@@ -15,7 +15,12 @@ def _as_round_dict(record: Any) -> dict[str, Any]:
             "commit": getattr(record, "commit", None),
             "perf_metric": getattr(record, "perf_metric", None),
             "perf_unit": getattr(record, "perf_unit", None),
+            "judge_perf_metric": getattr(record, "judge_perf_metric", None),
+            "judge_perf_name": getattr(record, "judge_perf_name", None),
+            "judge_success_rate": getattr(record, "judge_success_rate", None),
             "passed": getattr(record, "passed", False),
+            "global_objective_status": getattr(record, "global_objective_status", "unknown"),
+            "global_objective_reason": getattr(record, "global_objective_reason", ""),
             "profile_skipped": getattr(record, "profile_skipped", False),
         }
     if "round" in data and "round_number" not in data:
@@ -49,6 +54,8 @@ def benchmark_contract(goal_contract: dict[str, Any] | None) -> dict[str, Any]:
         "baseline_engine": baseline.get("engine"),
         "baseline_metrics": baseline_metrics,
         "baseline_value": baseline_value,
+        "benchmark_matrix": benchmark.get("benchmark_matrix"),
+        "acceptance": goal_contract.get("acceptance") if isinstance(goal_contract.get("acceptance"), dict) else {},
     }
 
 
@@ -66,7 +73,9 @@ def summarize_rounds(
 
     for record in records:
         data = _as_round_dict(record)
-        metric = _numeric(data.get("perf_metric"))
+        profiler_metric = _numeric(data.get("perf_metric"))
+        judge_metric = _numeric(data.get("judge_perf_metric"))
+        metric = judge_metric if judge_metric is not None else profiler_metric
         passed = bool(data.get("passed"))
         delta_pct = None
         if metric is not None and baseline_value:
@@ -74,9 +83,15 @@ def summarize_rounds(
         row = {
             "round": data.get("round_number"),
             "status": "passed" if passed else "failed",
+            "global_objective_status": data.get("global_objective_status", "unknown"),
+            "global_objective_reason": data.get("global_objective_reason", ""),
             "commit": data.get("commit"),
-            "metric_name": data.get("perf_unit") or primary_metric,
+            "metric_name": data.get("judge_perf_name") or data.get("perf_unit") or primary_metric,
             "metric_value": metric,
+            "metric_source": "judge" if judge_metric is not None else ("profiler" if profiler_metric is not None else None),
+            "profiler_metric_value": profiler_metric,
+            "judge_metric_value": judge_metric,
+            "judge_success_rate": _numeric(data.get("judge_success_rate")),
             "baseline_value": baseline_value,
             "delta_pct": delta_pct,
             "profile_skipped": bool(data.get("profile_skipped")),
@@ -89,8 +104,16 @@ def summarize_rounds(
             ):
                 best = row
 
+    latest = rows[-1] if rows else None
     return {
         "benchmark": contract,
         "rounds": rows,
         "best_round": best,
+        "latest_round": latest,
+        "global_objective_status": (
+            latest.get("global_objective_status") if isinstance(latest, dict) else "unknown"
+        ),
+        "global_objective_reason": (
+            latest.get("global_objective_reason") if isinstance(latest, dict) else ""
+        ),
     }

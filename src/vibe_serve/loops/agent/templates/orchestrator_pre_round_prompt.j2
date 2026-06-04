@@ -10,6 +10,16 @@ This call has ONE job: decide whether a profiling pass is needed **before** you 
 
 Read `progress.md` in your working directory. The end of the file has the most recent rounds.
 
+## Active benchmark gate and measured progress
+
+{{ benchmark_context }}
+
+This benchmark context is a framework signal, not optional background. If the
+latest measured benchmark trails the best measured benchmark or the target
+contract's active gate, your decision must preserve that global objective. A
+startup-only or health-only direction is valid only when startup is the current
+hard blocker; otherwise keep the benchmark gate alive.
+
 {% if regression_info %}
 ## Regression detected
 {{ regression_info }}

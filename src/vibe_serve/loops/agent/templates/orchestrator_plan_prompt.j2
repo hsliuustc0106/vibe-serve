@@ -31,6 +31,17 @@ baseline comparison, acceptance criteria, and forbidden shortcuts.
 
 Read `progress.md` in your working directory for the full history. The most recent entries matter most. You may also Read / Grep the workspace to inspect current code state.
 
+## Active benchmark gate and measured progress
+
+{{ benchmark_context }}
+
+This section is the loop's anti-drift guard. Your round may focus on a narrow
+blocker, but the plan must state how it moves the full benchmark-driven
+objective forward. Do not let a narrow task such as "make `/health` pass" hide a
+known throughput or success-rate regression. If the latest measured benchmark
+trails best-so-far, keep the performance recovery requirement explicit unless a
+hard earlier gate prevents benchmarking at all.
+
 ## Roadmap (your strategic memory across rounds)
 
 You own a free-form markdown file at `roadmap.md` in your working directory. The framework reseeds it on a fresh run, then reads it back into this prompt every round and otherwise leaves it alone. Use the Read/Edit/Write tools to keep it current.

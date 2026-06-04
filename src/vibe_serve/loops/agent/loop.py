@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -53,6 +54,11 @@ class _RoundRecord:
     perf_metric: float | None
     perf_unit: str | None
     passed: bool
+    judge_perf_metric: float | None = None
+    judge_perf_name: str | None = None
+    judge_success_rate: float | None = None
+    global_objective_status: str = "unknown"
+    global_objective_reason: str = ""
     # True when the orchestrator chose to skip profiling this round; the
     # perf_metric (if any) was reused / inherited from a prior measurement
     # rather than freshly measured this round.  Plateau detection ignores
@@ -66,7 +72,12 @@ class _RoundRecord:
             "commit": self.commit,
             "perf_metric": self.perf_metric,
             "perf_unit": self.perf_unit,
+            "judge_perf_metric": self.judge_perf_metric,
+            "judge_perf_name": self.judge_perf_name,
+            "judge_success_rate": self.judge_success_rate,
             "passed": self.passed,
+            "global_objective_status": self.global_objective_status,
+            "global_objective_reason": self.global_objective_reason,
             "profile_skipped": self.profile_skipped,
         }
 
@@ -78,6 +89,11 @@ class _RoundRecord:
             perf_metric=data.get("perf_metric"),
             perf_unit=data.get("perf_unit"),
             passed=bool(data.get("passed", False)),
+            judge_perf_metric=data.get("judge_perf_metric"),
+            judge_perf_name=data.get("judge_perf_name"),
+            judge_success_rate=data.get("judge_success_rate"),
+            global_objective_status=data.get("global_objective_status", "unknown"),
+            global_objective_reason=data.get("global_objective_reason", ""),
             profile_skipped=bool(data.get("profile_skipped", False)),
         )
 
@@ -106,14 +122,235 @@ def _save_round_summary(
     )
 
 
-def _best_round(records: list[_RoundRecord]) -> _RoundRecord | None:
-    best: _RoundRecord | None = None
-    for r in records:
-        if r.perf_metric is None or not r.passed:
+def _record_metric(record: _RoundRecord | dict[str, Any]) -> float | None:
+    if isinstance(record, dict):
+        judge_metric = record.get("judge_perf_metric")
+        return judge_metric if judge_metric is not None else record.get("perf_metric")
+    return record.judge_perf_metric if record.judge_perf_metric is not None else record.perf_metric
+
+
+def _record_metric_name(record: _RoundRecord | dict[str, Any]) -> str | None:
+    if isinstance(record, dict):
+        return record.get("judge_perf_name") or record.get("perf_unit")
+    return record.judge_perf_name or record.perf_unit
+
+
+def _record_round_number(record: _RoundRecord | dict[str, Any]) -> int | None:
+    if isinstance(record, dict):
+        value = record.get("round_number", record.get("round"))
+    else:
+        value = record.round_number
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _numeric_from_text(text: str, metric_name: str | None) -> float | None:
+    """Extract a numeric value for *metric_name* from unstructured LLM text.
+
+    Returns the last match from the first matching pattern group, excluding
+    values that appear in threshold context (``>=``, ``<=``). When the text
+    contains several non-threshold numbers near the metric name, ``matches[-1]``
+    is used as a best-effort tie-breaker. If extraction errors surface in
+    practice, consider preferring the number closest to the ``observed`` or
+    ``measured`` keyword instead.
+    """
+    if not metric_name:
+        return None
+    escaped = re.escape(metric_name)
+    pattern_groups = [
+        [
+            rf"\b{escaped}\b\s*[:=]\s*`?(-?\d+(?:\.\d+)?)",
+            rf"\b{escaped}\b\s+is\s+`?(-?\d+(?:\.\d+)?)",
+            rf"\b{escaped}\b\s+was\s+`?(-?\d+(?:\.\d+)?)",
+            rf"\breported\s+`?{escaped}\s*=\s*(-?\d+(?:\.\d+)?)",
+        ],
+        [
+            rf"\bobserved\b[^\n]{{0,120}}\b{escaped}\b[^0-9\-]{{0,40}}(-?\d+(?:\.\d+)?)",
+            rf"\bmeasured\b[^\n]{{0,120}}\b{escaped}\b[^0-9\-]{{0,40}}(-?\d+(?:\.\d+)?)",
+            rf"\bobserved\b[^0-9\-]{{0,40}}`?(-?\d+(?:\.\d+)?)`?[^\n]{{0,160}}\b{escaped}\b",
+            rf"\bmeasured\b[^0-9\-]{{0,40}}`?(-?\d+(?:\.\d+)?)`?[^\n]{{0,160}}\b{escaped}\b",
+            rf"\b{escaped}\b[^\n]{{0,160}}\bobserved\b[^0-9\-]{{0,40}}`?(-?\d+(?:\.\d+)?)",
+            rf"\b{escaped}\b[^\n]{{0,160}}\bmeasured\b[^0-9\-]{{0,40}}`?(-?\d+(?:\.\d+)?)",
+        ],
+    ]
+    threshold_patterns = [
+        rf"\b{escaped}\b\s*[<>]=?\s*`?(-?\d+(?:\.\d+)?)",
+    ]
+    threshold_values: set[str] = set()
+    for pattern in threshold_patterns:
+        threshold_values.update(re.findall(pattern, text, flags=re.IGNORECASE))
+    for patterns in pattern_groups:
+        matches: list[str] = []
+        for pattern in patterns:
+            matches.extend(re.findall(pattern, text, flags=re.IGNORECASE))
+        matches = [match for match in matches if match not in threshold_values]
+        if not matches:
             continue
-        if best is None or r.perf_metric > best.perf_metric:
-            best = r
-    return best
+        try:
+            return float(matches[-1])
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_judge_benchmark_metrics(
+    verdict: JudgeResponse | None,
+    goal_contract_data: dict[str, Any] | None,
+) -> tuple[float | None, str | None, float | None]:
+    """Extract headline benchmark data from the judge's structured text.
+
+    The judge is still an LLM reviewer, so benchmark output often lands in
+    ``analysis`` / ``feedback`` instead of a typed metric field. Persisting the
+    parsed value makes monitoring and future orchestration robust even when a
+    round fails.
+    """
+    if verdict is None:
+        return None, None, None
+    benchmark = (
+        goal_contract_data.get("benchmark")
+        if isinstance(goal_contract_data, dict) and isinstance(goal_contract_data.get("benchmark"), dict)
+        else {}
+    )
+    primary_metric = benchmark.get("primary_metric")
+    text = "\n".join([verdict.analysis or "", verdict.feedback or ""])
+    metric = _numeric_from_text(text, str(primary_metric) if primary_metric else None)
+    success_rate = _numeric_from_text(text, "success_rate")
+    return metric, str(primary_metric) if primary_metric else None, success_rate
+
+
+def _best_measured_metric(
+    records: list[_RoundRecord | dict[str, Any]],
+    *,
+    higher_is_better: bool = True,
+) -> tuple[int | None, float | None, str | None]:
+    best_record: _RoundRecord | None = None
+    best_metric: float | None = None
+    for record in records:
+        metric = _record_metric(record)
+        if metric is None:
+            continue
+        if best_metric is None or (
+            metric > best_metric if higher_is_better else metric < best_metric
+        ):
+            best_record = record
+            best_metric = metric
+    if best_record is None:
+        return None, None, None
+    return _record_round_number(best_record), best_metric, _record_metric_name(best_record)
+
+
+def _latest_measured_metric(records: list[_RoundRecord | dict[str, Any]]) -> tuple[int | None, float | None, str | None]:
+    for record in reversed(records):
+        metric = _record_metric(record)
+        if metric is not None:
+            return _record_round_number(record), metric, _record_metric_name(record)
+    return None, None, None
+
+
+def _required_success_rate(goal_contract_data: dict[str, Any] | None) -> float | None:
+    if not isinstance(goal_contract_data, dict):
+        return None
+    acceptance = goal_contract_data.get("acceptance")
+    if not isinstance(acceptance, dict):
+        return None
+    value = acceptance.get("success_rate")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _higher_is_better(goal_contract_data: dict[str, Any] | None) -> bool:
+    benchmark = (
+        goal_contract_data.get("benchmark")
+        if isinstance(goal_contract_data, dict) and isinstance(goal_contract_data.get("benchmark"), dict)
+        else {}
+    )
+    return bool(benchmark.get("higher_is_better", True))
+
+
+def _global_objective_status(
+    *,
+    passed: bool,
+    judge_perf_metric: float | None,
+    judge_perf_name: str | None,
+    judge_success_rate: float | None,
+    records: list[_RoundRecord | dict[str, Any]],
+    goal_contract_data: dict[str, Any] | None,
+) -> tuple[str, str]:
+    if not passed:
+        details = ["judge verdict failed"]
+        if judge_perf_metric is not None:
+            details.append(f"{judge_perf_name or 'metric'}={judge_perf_metric:g}")
+        if judge_success_rate is not None:
+            details.append(f"success_rate={judge_success_rate:g}")
+        return "failed", "; ".join(details)
+    required_success_rate = _required_success_rate(goal_contract_data)
+    if (
+        required_success_rate is not None
+        and judge_success_rate is not None
+        and judge_success_rate < required_success_rate
+    ):
+        return (
+            "failed",
+            f"success_rate {judge_success_rate:g} below required {required_success_rate:g}",
+        )
+    if judge_perf_metric is None:
+        return "unmeasured", "round passed but no judge benchmark metric was persisted"
+    best_round, best_metric, best_name = _best_measured_metric(
+        records,
+        higher_is_better=_higher_is_better(goal_contract_data),
+    )
+    if best_metric is None:
+        return "measured", f"recorded {judge_perf_name or 'metric'}={judge_perf_metric:g}"
+    improved = (
+        judge_perf_metric >= best_metric
+        if _higher_is_better(goal_contract_data)
+        else judge_perf_metric <= best_metric
+    )
+    if improved:
+        return (
+            "measured",
+            f"recorded {judge_perf_name or 'metric'}={judge_perf_metric:g}; best-so-far retained",
+        )
+    return (
+        "regressed",
+        f"{judge_perf_name or best_name or 'metric'} {judge_perf_metric:g} trails best round {best_round} value {best_metric:g}",
+    )
+
+
+def _benchmark_context(
+    records: list[_RoundRecord],
+    goal_contract_data: dict[str, Any] | None,
+) -> str:
+    if not isinstance(goal_contract_data, dict):
+        return "No machine-readable goal contract is available."
+    benchmark = goal_contract_data.get("benchmark") if isinstance(goal_contract_data.get("benchmark"), dict) else {}
+    acceptance = goal_contract_data.get("acceptance") if isinstance(goal_contract_data.get("acceptance"), dict) else {}
+    primary_metric = benchmark.get("primary_metric") or "unknown"
+    higher = _higher_is_better(goal_contract_data)
+    latest_round, latest_metric, latest_name = _latest_measured_metric(records)
+    best_round, best_metric, best_name = _best_measured_metric(records, higher_is_better=higher)
+    matrix = benchmark.get("benchmark_matrix")
+    matrix_text = json.dumps(matrix, indent=2) if matrix else "not specified"
+    parts = [
+        f"- Headline metric: {primary_metric} ({'higher' if higher else 'lower'} is better).",
+        f"- Acceptance success_rate: {acceptance.get('success_rate', 'not specified')}.",
+        f"- Benchmark matrix: {matrix_text}.",
+        (
+            f"- Latest measured benchmark: round {latest_round}, {latest_name or primary_metric}={latest_metric:g}."
+            if latest_metric is not None
+            else "- Latest measured benchmark: none recorded yet."
+        ),
+        (
+            f"- Best measured benchmark: round {best_round}, {best_name or primary_metric}={best_metric:g}."
+            if best_metric is not None
+            else "- Best measured benchmark: none recorded yet."
+        ),
+    ]
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -136,8 +373,9 @@ def _detect_plateau(
     of each other; else None.
 
     Rules:
-    - ``profile_skipped`` rounds don't count as fresh measurements (their
-      perf was reused from earlier).
+    - Profiler-only metrics from ``profile_skipped`` rounds don't count as
+      fresh measurements, but judge benchmark metrics do: they are measured by
+      the judge even when no profiler ran.
     - Only rounds with the *same* ``perf_unit`` as the latest fresh round
       count toward the streak — comparing latency_ms against tok/s as raw
       floats is a category error.
@@ -149,16 +387,20 @@ def _detect_plateau(
     fresh = [
         r
         for r in records
-        if r.perf_metric is not None and not r.profile_skipped
+        if _record_metric(r) is not None
+        and (r.judge_perf_metric is not None or not r.profile_skipped)
     ]
     if len(fresh) < min_streak:
         return None
-    latest_unit = fresh[-1].perf_unit
-    same_unit = [r for r in fresh if r.perf_unit == latest_unit]
+    latest_unit = _record_metric_name(fresh[-1])
+    same_unit = [r for r in fresh if _record_metric_name(r) == latest_unit]
     if len(same_unit) < min_streak:
         return None
     tail = same_unit[-min_streak:]
-    perfs = [r.perf_metric for r in tail]
+    perfs = [_record_metric(r) for r in tail]
+    if any(perf is None for perf in perfs):
+        return None
+    perfs = [float(perf) for perf in perfs if perf is not None]
     hi = max(perfs)
     lo = min(perfs)
     if hi <= 0:
@@ -237,6 +479,7 @@ def _run_pre_round_decision(
     objective: str,
     carry: _CarryOver,
     progress_path: Path,
+    benchmark_context: str,
 ) -> PreRoundDecision:
     system_prompt = render_template(
         "orchestrator_pre_round_prompt.j2",
@@ -244,6 +487,7 @@ def _run_pre_round_decision(
         objective=objective,
         regression_info=carry.regression_info,
         exhaustion_info=carry.exhaustion_info,
+        benchmark_context=benchmark_context,
     )
     decision = ctx.invoke(
         kind="orchestrator",
@@ -310,6 +554,7 @@ def _run_orchestrator_plan(
     roadmap_text: str,
     plateau_warning: str | None,
     goal_contract: str | None,
+    benchmark_context: str,
 ) -> OrchestratorPlan:
     system_prompt = render_template(
         "orchestrator_plan_prompt.j2",
@@ -323,6 +568,7 @@ def _run_orchestrator_plan(
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
         goal_contract=goal_contract,
+        benchmark_context=benchmark_context,
     )
     plan = ctx.invoke(
         kind="orchestrator",
@@ -401,6 +647,7 @@ def _run_judge(
         bench_path=ctx.judge_bench_path,
         pass_criteria=plan.pass_criteria,
         modality=modality,
+        round_number=round_number,
         retry=retry,
         runtime_notes=ctx.run_environment_view.prompt_notes,
         env_kind=ctx.run_environment_view.env_kind,
@@ -528,19 +775,19 @@ def run_agent_loop(
                     objective=objective,
                     carry=carry,
                     progress_path=progress_path,
+                    benchmark_context=_benchmark_context(records, goal_contract_data),
                 )
-                # FORCE-PROFILE override: every non-cold-start round profiles,
-                # ignoring orchestrator's need_profile decision. Revert this
-                # block to restore orchestrator-decided profiling.
-                profiler_summary = _run_profiler(
-                    ctx,
-                    round_number=round_number,
-                    profile_focus=pre.profile_focus or "general latency hotspots on /v1/completions",
-                    modality=modality,
-                    progress_path=progress_path,
-                    objective=objective,
-                    goal_contract=goal_contract,
-                )
+                if pre.need_profile:
+                    profiler_summary = _run_profiler(
+                        ctx,
+                        round_number=round_number,
+                        profile_focus=pre.profile_focus
+                        or "general latency hotspots on /v1/completions",
+                        modality=modality,
+                        progress_path=progress_path,
+                        objective=objective,
+                        goal_contract=goal_contract,
+                    )
 
             # --- Orchestrator plan ---
             roadmap_text = issue_board.read_roadmap(roadmap_path)
@@ -555,6 +802,7 @@ def run_agent_loop(
                 roadmap_text=roadmap_text,
                 plateau_warning=plateau_warning,
                 goal_contract=goal_contract,
+                benchmark_context=_benchmark_context(records, goal_contract_data),
             )
 
             # No early stop: the loop always consumes the full max_rounds
@@ -584,6 +832,7 @@ def run_agent_loop(
             # --- Implementer / Judge retry loop ---
             feedback: str | None = None
             passed = False
+            verdict: JudgeResponse | None = None
             for retry in range(1, max_retries_per_round + 1):
                 ctx.lprint(f"\n--- attempt {retry}/{max_retries_per_round} ---\n")
                 ctx.reselect_gpu()
@@ -616,7 +865,7 @@ def run_agent_loop(
             # --- Record round result & update carry-over ---
             commit = _current_commit_sha(ctx)
             # `profile_skipped` is True when no fresh profile ran this round
-            # (cold-start or the orchestrator/framework decided to skip).
+            # (cold-start or the orchestrator decided to skip).
             # The plateau detector ignores skipped-profile rounds so cached
             # / inherited perf numbers don't masquerade as fresh measurements.
             profile_skipped = profiler_summary is None
@@ -630,6 +879,17 @@ def run_agent_loop(
                 if (profiler_summary and passed)
                 else None
             )
+            judge_perf_metric, judge_perf_name, judge_success_rate = (
+                _extract_judge_benchmark_metrics(verdict, goal_contract_data)
+            )
+            global_status, global_reason = _global_objective_status(
+                passed=passed,
+                judge_perf_metric=judge_perf_metric,
+                judge_perf_name=judge_perf_name,
+                judge_success_rate=judge_success_rate,
+                records=records,
+                goal_contract_data=goal_contract_data,
+            )
             records.append(
                 _RoundRecord(
                     round_number=round_number,
@@ -637,6 +897,11 @@ def run_agent_loop(
                     perf_metric=perf_metric,
                     perf_unit=perf_unit,
                     passed=passed,
+                    judge_perf_metric=judge_perf_metric,
+                    judge_perf_name=judge_perf_name,
+                    judge_success_rate=judge_success_rate,
+                    global_objective_status=global_status,
+                    global_objective_reason=global_reason,
                     profile_skipped=profile_skipped,
                 )
             )
@@ -655,17 +920,25 @@ def run_agent_loop(
                 carry.regression_info = None
             else:
                 carry.exhaustion_info = None
-                if perf_metric is not None:
-                    best = _best_round(records[:-1])
-                    if best is None or perf_metric > best.perf_metric:
+                current_metric = judge_perf_metric if judge_perf_metric is not None else perf_metric
+                if current_metric is not None:
+                    best_round_no, best_metric, best_metric_name = _best_measured_metric(
+                        records[:-1],
+                        higher_is_better=_higher_is_better(goal_contract_data),
+                    )
+                    if best_metric is None or (
+                        current_metric > best_metric
+                        if _higher_is_better(goal_contract_data)
+                        else current_metric < best_metric
+                    ):
                         carry.regression_info = None
                     else:
                         carry.regression_info = (
                             f"Round {round_number} perf_metric="
-                            f"{perf_metric}{(' ' + perf_unit) if perf_unit else ''} "
-                            f"did not beat best={best.perf_metric}"
-                            f"{(' ' + (best.perf_unit or '')) if best.perf_unit else ''} "
-                            f"at round {best.round_number}."
+                            f"{current_metric}{(' ' + (judge_perf_name or perf_unit or '')) if (judge_perf_name or perf_unit) else ''} "
+                            f"did not beat best={best_metric}"
+                            f"{(' ' + (best_metric_name or '')) if best_metric_name else ''} "
+                            f"at round {best_round_no}."
                         )
 
             round_number += 1
