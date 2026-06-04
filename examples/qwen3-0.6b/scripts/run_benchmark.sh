@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 URL="${VIBESERVE_URL:-http://localhost:8000}"
-MODEL="${VIBESERVE_MODEL:-${SERVED_MODEL_NAME:-${MODEL_ID:-model}}}"
+MODEL="${VIBESERVE_MODEL:-Qwen/Qwen3-0.6B}"
 ENDPOINT="${VIBESERVE_BENCH_ENDPOINT:-/v1/completions}"
-OUT_DIR="${VIBESERVE_BENCH_OUT_DIR:-./benchmark_results}"
-UV_ENV="${VIBESERVE_BENCH_UV_ENV:-./.venv-vllm-bench}"
+OUT_DIR="${VIBESERVE_BENCH_OUT_DIR:-/tmp/qwen3_0.6b_vllm_bench}"
+UV_ENV="${VIBESERVE_BENCH_UV_ENV:-$ROOT_DIR/.venv-vllm-bench}"
 INSTALL_SPEC="${VIBESERVE_BENCH_VLLM_INSTALL_SPEC:-vllm}"
 PYTHON_BIN="${VIBESERVE_BENCH_PYTHON:-python3}"
 
 WARMUP_PROMPTS="${VIBESERVE_BENCH_WARMUP_PROMPTS:-1}"
-RANDOM_INPUT_LEN="${VIBESERVE_BENCH_RANDOM_INPUT_LEN:-1024}"
+RANDOM_INPUT_LEN="${VIBESERVE_BENCH_RANDOM_INPUT_LEN:-512}"
 RANDOM_OUTPUT_LEN="${VIBESERVE_BENCH_RANDOM_OUTPUT_LEN:-128}"
-CASES="${VIBESERVE_BENCH_CASES:-1:4}"
+CASES="${VIBESERVE_BENCH_CASES:-32:64}"
 
 if [[ ! -x "$UV_ENV/bin/python" ]]; then
   uv venv --python "$PYTHON_BIN" "$UV_ENV"
@@ -61,3 +62,4 @@ for item in "${CASE_LIST[@]}"; do
 done
 
 echo "benchmark results: $OUT_DIR"
+
